@@ -30,11 +30,19 @@
 
 ;;; Code:
 
-(defvar yaml-pro-tree nil)
-
 (require 'yaml)
 
+(defgroup yaml-pro nil
+  "YAML editing tools."
+  :prefix "yaml-pro-"
+  :group 'convenience)
+
+(defface yaml-pro-fold-replacement-face
+  '((t :inherit 'font-lock-comment-face))
+  "Face for fold replacement text.")
+
 (defun yaml-pro-get-block (tree point)
+  "Return subtree from TREE that best contain POINT."
   (if (not (listp tree))
       nil
     (let ((sub-blocks (seq-filter #'identity
@@ -43,17 +51,23 @@
       (cond
        (sub-blocks
         ;; TODO should find best match instead of firt (?)
+        (message ">>> %d" (length sub-blocks))
         (car sub-blocks))
        ((and (eql (car tree) 'yaml-position)
-             (<= (1+ (nth 1 tree)) point (1+ (nth 2 tree))))
+             (<= (1+ (nth 1 tree)) point (1+ (nth 2 tree)))
+             ;; hack to get small maps to not get selected
+             (yaml-pro--fix-bounds (list (1+ (nth 1 tree)) (1+ (nth 2 tree)))))
         (list (1+ (nth 1 tree)) (1+ (nth 2 tree))))
        (t nil)))))
 
 (defun yaml-pro--fix-bounds (bounds)
+  "Adjust BOUNDS to proper fold points."
   (seq-let (beg end) bounds
     (save-excursion
       (goto-char beg)
       (cond
+       ((looking-at-p "[ \t]*-")
+        (setq beg (1- (point))))
        ((and (not (looking-at "{"))
              (not (looking-at "\\[")))
         (end-of-line)
@@ -63,23 +77,49 @@
       (cond
        ((looking-back "\n" (- (point) 2))
         (setq end (1- end)))))
-    (list beg end)))
+    (if (= beg end)
+        nil
+      (list beg end))))
 
 (defun yaml-pro-fold-at-point ()
-  "Toggle YAML fold at point."
+  "Fold YAML at point."
   (interactive)
   (save-excursion
-    (beginning-of-line 1)
     (skip-syntax-forward " " (line-end-position))
     (let ((parse-tree (yaml-parse-tree (buffer-string))))
       (let* ((bounds (yaml-pro--fix-bounds (yaml-pro-get-block parse-tree (point))))
              (beg (car bounds))
-             (end (cadr bounds))
-             (ov (make-overlay beg end)))
-        (overlay-put ov 'creator 'yaml-pro)
-        (overlay-put ov 'invisible 'yaml-pro)
-        (overlay-put ov 'display "...")
-        (overlay-put ov 'face 'origami-fold-replacement-face)))))
+             (end (cadr bounds)))
+        (when bounds
+          ;; Delete all inner folds before creating outer one
+          (let ((ovs (overlays-in beg end)))
+            (dolist (ov ovs)
+              (when (eql (overlay-get ov 'creator) 'yaml-pro)
+                (delete-overlay ov))))
+          (let ((ov (make-overlay beg end)))
+            (overlay-put ov 'creator 'yaml-pro)
+            (overlay-put ov 'invisible 'yaml-pro)
+            (overlay-put ov 'display "...")
+            (overlay-put ov 'face 'yaml-pro-fold-replacement-face)))))))
+
+(defun yaml-pro-unfold-at-point ()
+  "Unfold YAML at point."
+  (interactive)
+  (save-excursion
+    (cond
+     ((looking-at ".*:")
+      (let ((ovs (overlays-in (point) (save-excursion (end-of-line) (1+ (point))))))
+        (dolist (ov ovs)
+          (when (eql (overlay-get ov 'creator) 'yaml-pro)
+            (delete-overlay ov)))))
+     (t
+      (let ((ovs (overlays-at (1+ (point)))))
+        (dolist (ov ovs)
+          (when (eql (overlay-get ov 'creator) 'yaml-pro)
+            (delete-overlay ov))))))))
+
+(define-key yaml-mode-map (kbd "C-c C-c") #'yaml-pro-fold-at-point)
+(define-key yaml-mode-map (kbd "C-c C-o") #'yaml-pro-unfold-at-point)
 
 (provide 'yaml-pro)
 
