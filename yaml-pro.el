@@ -41,6 +41,56 @@
   '((t :inherit 'font-lock-comment-face))
   "Face for fold replacement text.")
 
+(defvar-local yaml-pro-buffer-tree nil)
+
+(defun yaml-pro--get-buffer-tree ()
+  (or yaml-pro-buffer-tree
+      (let ((tree (yaml-parse-tree (buffer-string))))
+        (progn
+          (setq yaml-pro-buffer-tree tree)
+          tree))))
+
+(defun yaml-pro--after-change-hook (_ _ _)
+  (setq yaml-pro-buffer-tree nil))
+
+(defun yaml-pro--get-parent-block* (tree point)
+  "Return subtree from TREE that best contain POINT."
+  (if (not (listp tree))
+      nil
+    (let ((sub-blocks (seq-filter #'identity
+                                  (seq-map (lambda (st) (yaml-pro--get-parent-block* st point))
+                                           tree))))
+      (cond
+       ((and sub-blocks
+             (eql (car tree) 'yaml-position)
+             (<= (1+ (nth 1 tree)) point (1+ (nth 2 tree))))
+        (throw 'result (list (1+ (nth 1 tree)) (1+ (nth 2 tree)))))
+       (sub-blocks
+        (car sub-blocks))
+       ((and (eql (car tree) 'yaml-position)
+             (<= (1+ (nth 1 tree)) point (1+ (nth 2 tree))))
+        (list (1+ (nth 1 tree)) (1+ (nth 2 tree))))
+       (t nil)))))
+(defun yaml-pro-get-parent-block (tree point)
+  (catch 'result
+    (yaml-pro--get-parent-block* tree point)))
+
+(defun yaml-pro-get-block-bounds (tree point)
+  "Return subtree from TREE that best contain POINT."
+  (if (not (listp tree))
+      nil
+    (let ((sub-blocks (seq-filter #'identity
+                                  (seq-map (lambda (st) (yaml-pro-get-block st point))
+                                           tree))))
+      (cond
+       (sub-blocks
+        ;; TODO should find best match instead of firt (?)
+        (car sub-blocks))
+       ((and (eql (car tree) 'yaml-position)
+             (<= (1+ (nth 1 tree)) point (1+ (nth 2 tree))))
+        (list (1+ (nth 1 tree)) (1+ (nth 2 tree))))
+       (t nil)))))
+
 (defun yaml-pro-get-block (tree point)
   "Return subtree from TREE that best contain POINT."
   (if (not (listp tree))
@@ -71,15 +121,29 @@
        ((and (not (looking-at "{"))
              (not (looking-at "\\[")))
         (end-of-line)
-        (setq beg (point)))))
+        (setq beg (point)))
+       ((looking-at-p "\\(\\[\\|{\\)")
+        (setq beg (1+ (point))))))
     (save-excursion
       (goto-char end)
       (cond
        ((looking-back "\n" (- (point) 2))
+        (setq end (1- end)))
+       ((looking-back "\\(\\]\\|\\}\\)" (- (point) 2))
         (setq end (1- end)))))
     (if (= beg end)
         nil
       (list beg end))))
+
+(defun yaml-pro-hide-overlay (ov)
+  (overlay-put ov 'invisible 'origami)
+  (overlay-put ov 'display origami-fold-replacement)
+  (overlay-put ov'face 'yaml-pro-fold-replacement-face))
+
+(defun yaml-pro-show-overlay (ov)
+  (overlay-put ov 'invisible nil)
+  (overlay-put ov 'display nil)
+  (overlay-put ov 'face nil))
 
 (defun yaml-pro-fold-at-point ()
   "Fold YAML at point."
@@ -99,6 +163,10 @@
           (let ((ov (make-overlay beg end)))
             (overlay-put ov 'creator 'yaml-pro)
             (overlay-put ov 'invisible 'yaml-pro)
+            (overlay-put ov 'isearch-open-invisible 'yaml-pro-isearch-show)
+            (overlay-put ov 'isearch-open-invisible-temporary
+                         (lambda (ov hide-p) (if hide-p (yaml-pro-hide-overlay ov)
+                                               (yaml-pro-show-overlay ov))))
             (overlay-put ov 'display "...")
             (overlay-put ov 'face 'yaml-pro-fold-replacement-face)))))))
 
@@ -118,6 +186,28 @@
           (when (eql (overlay-get ov 'creator) 'yaml-pro)
             (delete-overlay ov))))))))
 
+(defun yaml-pro-up-level ()
+  (interactive)
+  (if (and (bolp) (not (looking-at "[ \n\t#]")))
+      (goto-char (point-min))
+    (let* ((start (point))
+           (parse-tree (yaml-pro--get-buffer-tree))
+           (bounds (yaml-pro-get-block-bounds parse-tree (point))))
+      (goto-char (car bounds))
+      (when (= start (point))
+        (let ((parse-tree (yaml-pro--get-buffer-tree))
+              (bounds (yaml-pro-get-parent-block parse-tree (point))))
+          (goto-char (car bounds))
+          (when (= start (point))
+            ;; the block we're at and it's parent have the same start,
+            ;; move back one char and try again
+            (forward-char -1)
+            (yaml-pro-up-level))))
+      (when (and (bolp) (looking-at "[ \t]"))
+        ;; Don't let the command end at a block that begins a line
+        (yaml-pro-up-level)))))
+
+(define-key yaml-mode-map (kbd "C-c C-u") #'yaml-pro-up-level)
 (define-key yaml-mode-map (kbd "C-c C-c") #'yaml-pro-fold-at-point)
 (define-key yaml-mode-map (kbd "C-c C-o") #'yaml-pro-unfold-at-point)
 
