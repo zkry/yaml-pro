@@ -80,7 +80,7 @@
   (if (not (listp tree))
       nil
     (let ((sub-blocks (seq-filter #'identity
-                                  (seq-map (lambda (st) (yaml-pro-get-block st point))
+                                  (seq-map (lambda (st) (yaml-pro-get-block-bounds st point))
                                            tree))))
       (cond
        (sub-blocks
@@ -207,7 +207,61 @@
         ;; Don't let the command end at a block that begins a line
         (yaml-pro-up-level)))))
 
+(defun yaml-pro-kill-subtree ()
+  (interactive)
+  (let* ((parse-tree (yaml-pro--get-buffer-tree))
+         (bounds (yaml-pro-get-block-bounds parse-tree (point)))
+         (start (car bounds))
+         (end (cadr bounds)))
+    (when (save-excursion
+            (goto-char end)
+            (looking-back "\n" (- (point) 2)))
+      (setq end (1- end)))
+    (kill-region start end)))
+
+(defun yaml-pro-prev-subtree ()
+  (interactive)
+  (let* ((start-pos (point))
+         (parse-tree (yaml-pro--get-buffer-tree))
+         (at-bounds (yaml-pro-get-block-bounds parse-tree (point))))
+    (goto-char (car at-bounds))
+    (let ((at-col (current-column))
+          (at-dash-p (looking-at "-")))
+      (catch 'done
+       (while (not (bobp))
+         (forward-line -1)
+         (if at-dash-p
+             (skip-chars-forward " \n")
+           (skip-chars-forward " \n-"))
+         (when (and (< (current-column) at-col)
+                    (not (looking-at "#")))
+           (goto-char start-pos)
+           (ding)
+           (throw 'done nil))
+         (when (and (= (current-column) at-col)
+                    (not (looking-at "#")))
+           (throw 'done nil)))
+       (when (looking-at "#")
+         (goto-char start-pos)
+         (ding))))))
+
+(defun yaml-pro-next-subtree ()
+  (interactive)
+  (let* ((start-pos (point))
+         (start-col (current-column))
+         (parse-tree (yaml-pro--get-buffer-tree))
+         (at-bounds (yaml-pro-get-block-bounds parse-tree (point))))
+    (goto-char (cadr at-bounds))
+    (skip-chars-forward " \n")
+    (when (or (not (= start-col (current-column)))
+              (eobp))
+      (ding)
+      (goto-char start-pos))))
+
 (define-key yaml-mode-map (kbd "C-c C-u") #'yaml-pro-up-level)
+(define-key yaml-mode-map (kbd "C-c C-x C-w") #'yaml-pro-kill-subtree)
+(define-key yaml-mode-map (kbd "C-c C-x C-p") #'yaml-pro-prev-subtree)
+(define-key yaml-mode-map (kbd "C-c C-x C-n") #'yaml-pro-next-subtree)
 (define-key yaml-mode-map (kbd "C-c C-c") #'yaml-pro-fold-at-point)
 (define-key yaml-mode-map (kbd "C-c C-o") #'yaml-pro-unfold-at-point)
 
