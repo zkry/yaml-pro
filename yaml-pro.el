@@ -258,6 +258,24 @@
       (ding)
       (goto-char start-pos))))
 
+(defun yaml-pro-move-subtree-up ()
+  "Swap the current subtree with the previous one."
+  (interactive)
+  (let* ((parse-tree (yaml-pro--get-buffer-tree))
+         (at-bounds (yaml-pro-get-block-bounds parse-tree (point)))
+         (at-contents (buffer-substring (car at-bounds) (cadr at-bounds)))
+         (prev-bounds (save-excursion
+                        (yaml-pro-prev-subtree)
+                        (yaml-pro-get-block-bounds parse-tree (point))))
+         (prev-contents (buffer-substring (car prev-bounds) (cadr prev-bounds))))
+    (goto-char (car at-bounds))
+    (delete-region (car at-bounds) (cadr at-bounds))
+    (insert prev-contents)
+    (goto-char (car prev-bounds))
+    (delete-region (car prev-bounds) (cadr prev-bounds))
+    (insert at-contents)
+    (goto-char (car prev-bounds))))
+
 (define-key yaml-mode-map (kbd "C-c C-u") #'yaml-pro-up-level)
 (define-key yaml-mode-map (kbd "C-c C-x C-w") #'yaml-pro-kill-subtree)
 (define-key yaml-mode-map (kbd "C-c C-x C-p") #'yaml-pro-prev-subtree)
