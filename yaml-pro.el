@@ -62,16 +62,28 @@
                                            tree))))
       (cond
        ((and sub-blocks
-             (eql (car tree) 'yaml-position)
-             (<= (1+ (nth 1 tree)) point (1+ (nth 2 tree))))
-        (throw 'result (list (1+ (nth 1 tree)) (1+ (nth 2 tree)))))
+             (stringp (car tree))
+             (let* ((bounds (get-text-property 0 'yaml-position (cadr tree)))
+                    (start (1+ (car bounds)))
+                    (end (1+ (cdr bounds))))
+               (and (numberp start) (<= start point end))))
+        (let* ((bounds (get-text-property 0 'yaml-position (cadr tree)))
+               (start (1+ (car bounds)))
+               (end (1+ (cdr bounds))))
+          (throw 'result (list start end))))
        (sub-blocks
         (car sub-blocks))
-       ((and (eql (car tree) 'yaml-position)
-             (<= (1+ (nth 1 tree)) point (1+ (nth 2 tree))))
-        (list (1+ (nth 1 tree)) (1+ (nth 2 tree))))
+       ((stringp (car tree))
+        (let* ((bounds (get-text-property 0 'yaml-position (cadr tree)))
+               (start (and bounds (1+ (car bounds))))
+               (end (and bounds (1+ (cdr bounds)))))
+          (if (and (numberp start) (<= start point end))
+              (list start end)
+            nil)))
        (t nil)))))
+
 (defun yaml-pro-get-parent-block (tree point)
+  "Return the nearest parent block in TREE to node in POINT."
   (catch 'result
     (yaml-pro--get-parent-block* tree point)))
 
@@ -86,9 +98,17 @@
        (sub-blocks
         ;; TODO should find best match instead of firt (?)
         (car sub-blocks))
-       ((and (eql (car tree) 'yaml-position)
-             (<= (1+ (nth 1 tree)) point (1+ (nth 2 tree))))
-        (list (1+ (nth 1 tree)) (1+ (nth 2 tree))))
+       ((and (stringp (car tree)) (not (equal (car tree) "")))
+        (let* ((bounds (get-text-property 0 'yaml-position (cadr tree)))
+               (start (and bounds (1+ (car bounds))))
+               (end (and bounds (1+ (cdr bounds)))))
+          (if (and
+               (numberp start)
+               (<= start point end)
+               (not (= (save-excursion (goto-char start) (beginning-of-line) (point))
+                       (save-excursion (goto-char end) (beginning-of-line) (point)))))
+              (list start end)
+            nil)))
        (t nil)))))
 
 (defun yaml-pro-get-block (tree point)
@@ -101,13 +121,17 @@
       (cond
        (sub-blocks
         ;; TODO should find best match instead of firt (?)
-        (message ">>> %d" (length sub-blocks))
         (car sub-blocks))
-       ((and (eql (car tree) 'yaml-position)
-             (<= (1+ (nth 1 tree)) point (1+ (nth 2 tree)))
-             ;; hack to get small maps to not get selected
-             (yaml-pro--fix-bounds (list (1+ (nth 1 tree)) (1+ (nth 2 tree)))))
-        (list (1+ (nth 1 tree)) (1+ (nth 2 tree))))
+       ((stringp (car tree))
+        (let* ((bounds (get-text-property 0 'yaml-position (cadr tree)))
+               (start (and bounds (1+ (car bounds))))
+               (end (and bounds (1+ (cdr bounds)))))
+          (if (and (numberp start)
+                   (<= start point end)
+                   ;; hack to get small maps to not get selected
+                   (yaml-pro--fix-bounds (list start end)))
+              (list start end)
+            nil)))
        (t nil)))))
 
 (defun yaml-pro--fix-bounds (bounds)
@@ -131,7 +155,7 @@
         (setq end (1- end)))
        ((looking-back "\\(\\]\\|\\}\\)" (- (point) 2))
         (setq end (1- end)))))
-    (if (= beg end)
+    (if (>= beg end)
         nil
       (list beg end))))
 
@@ -150,7 +174,7 @@
   (interactive)
   (save-excursion
     (skip-syntax-forward " " (line-end-position))
-    (let ((parse-tree (yaml-parse-tree (buffer-string))))
+    (let ((parse-tree (yaml-pro--get-buffer-tree)))
       (let* ((bounds (yaml-pro--fix-bounds (yaml-pro-get-block parse-tree (point))))
              (beg (car bounds))
              (end (cadr bounds)))
@@ -290,6 +314,8 @@
 (define-key yaml-mode-map (kbd "C-c C-x C-n") #'yaml-pro-next-subtree)
 (define-key yaml-mode-map (kbd "C-c C-c") #'yaml-pro-fold-at-point)
 (define-key yaml-mode-map (kbd "C-c C-o") #'yaml-pro-unfold-at-point)
+(add-hook 'after-change-functions #'yaml-pro--after-change-hook nil t)
+
 
 (provide 'yaml-pro)
 
