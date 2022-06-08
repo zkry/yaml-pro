@@ -308,15 +308,50 @@
     (insert at-contents)
     (goto-char (car prev-bounds))))
 
+(defconst yaml-tree (yaml-parse-string-with-pos "a: b\nc:\n  d: x\ne: f"))
+
+(defun yaml-pro--search-location (tree point path)
+  "Return path up to POINT of TREE having visited at PATH."
+  (seq-find #'identity
+            (seq-map
+             (lambda (tuple)
+               (let* ((key (car tuple))
+                      (key-pos (and (stringp key) (get-text-property 0 'yaml-position key)))
+                      (val (cdr tuple))
+                      (val-pos (and (stringp val) (get-text-property 0 'yaml-position val))))
+                 (cond
+                  ((and key-pos (<= (car key-pos) point (cdr key-pos)))
+                   path)
+                  ((and val-pos (<= (car val-pos) point (cdr val-pos)))
+                   (cons key path))
+                  ((listp val)
+                   (yaml-pro--search-location val point (cons key path)))
+                  (t nil))))
+             tree)))
+
+(defun yaml-pro--path-at-point ()
+  "Return the object path to current point."
+  (let* ((parse (yaml-parse-string-with-pos (buffer-string)))
+         (path (yaml-pro--search-location parse (point) '())))
+    ;; first look for current position
+    (or (nreverse path)
+        (when (looking-back "[ \"a-zA-Z_-]+:[ \"a-zA-Z_-]+" (- (point) 60))
+          (beginning-of-line)
+          (let ((path (skip-chars-forward " " (yaml-pro--search-location parse (point) '()))))
+            (nreverse path))))))
+
 (defconst yaml-pro-mode-map
   (let ((map (make-sparse-keymap)))
     (prog1 map
       ;;(suppress-keymap map)
       (set-keymap-parent map yaml-mode-map)
-      (define-key map (kbd "C-c C-u") #'yaml-pro-up-level)
       (define-key map (kbd "C-c C-x C-w") #'yaml-pro-kill-subtree)
-      (define-key map (kbd "C-c C-x C-p") #'yaml-pro-prev-subtree)
-      (define-key map (kbd "C-c C-x C-n") #'yaml-pro-next-subtree)
+
+      (define-key map (kbd "C-c C-u") #'yaml-pro-up-level)
+
+      (define-key map (kbd "C-c C-p") #'yaml-pro-prev-subtree)
+      (define-key map (kbd "C-c C-n") #'yaml-pro-next-subtree)
+
       (define-key map (kbd "C-c C-c") #'yaml-pro-fold-at-point)
       (define-key map (kbd "C-c C-o") #'yaml-pro-unfold-at-point))))
 
