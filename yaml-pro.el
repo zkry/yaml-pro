@@ -308,14 +308,21 @@
     (insert at-contents)
     (goto-char (car prev-bounds))))
 
-(define-key yaml-mode-map (kbd "C-c C-u") #'yaml-pro-up-level)
-(define-key yaml-mode-map (kbd "C-c C-x C-w") #'yaml-pro-kill-subtree)
-(define-key yaml-mode-map (kbd "C-c C-x C-p") #'yaml-pro-prev-subtree)
-(define-key yaml-mode-map (kbd "C-c C-x C-n") #'yaml-pro-next-subtree)
-(define-key yaml-mode-map (kbd "C-c C-c") #'yaml-pro-fold-at-point)
-(define-key yaml-mode-map (kbd "C-c C-o") #'yaml-pro-unfold-at-point)
-(add-hook 'after-change-functions #'yaml-pro--after-change-hook nil t)
+(defconst yaml-pro-mode-map
+  (let ((map (make-sparse-keymap)))
+    (prog1 map
+      ;;(suppress-keymap map)
+      (set-keymap-parent map yaml-mode-map)
+      (define-key map (kbd "C-c C-u") #'yaml-pro-up-level)
+      (define-key map (kbd "C-c C-x C-w") #'yaml-pro-kill-subtree)
+      (define-key map (kbd "C-c C-x C-p") #'yaml-pro-prev-subtree)
+      (define-key map (kbd "C-c C-x C-n") #'yaml-pro-next-subtree)
+      (define-key map (kbd "C-c C-c") #'yaml-pro-fold-at-point)
+      (define-key map (kbd "C-c C-o") #'yaml-pro-unfold-at-point))))
 
+(define-derived-mode yaml-pro-mode yaml-mode "YAML-pro"
+  "Major mode providing  convenience functions for editing YAML."
+  (add-hook 'after-change-functions #'yaml-pro--after-change-hook nil t))
 
 (provide 'yaml-pro)
 
