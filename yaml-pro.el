@@ -3,9 +3,9 @@
 ;; Author: Zachary Romero
 ;; Maintainer: Zachary Romero
 ;; Version: 0.1.0
-;; Package-Requires: (())
-;; Homepage: https://github.com/zkry/yaml-pro.el
-;; Keywords: ?
+;; Package-Requires: ((yaml "0.4.0"))
+;; Homepage: https://github.com/zkry/yaml-pro
+;; Keywords: tools
 
 
 ;; This file is not part of GNU Emacs
@@ -26,7 +26,12 @@
 
 ;;; Commentary:
 
-;; no
+;; yaml-pro contains a new mode which provides conveniences when
+;; editing YAML.  Running `yaml-pro-mode' switches the mode and the
+;; following commands are available: `yaml-pro-move-subtree-up',
+;; `yaml-pro-next-subtree', `yaml-pro-prev-subtree',
+;; `yaml-pro-kill-subtree', `yaml-pro-up-level',
+;; `yaml-pro-unfold-at-point', and `yaml-pro-fold-at-point'.
 
 ;;; Code:
 
@@ -44,6 +49,7 @@
 (defvar-local yaml-pro-buffer-tree nil)
 
 (defun yaml-pro--get-buffer-tree ()
+  "Return the cached buffer-tree if exists, else regenerate it."
   (or yaml-pro-buffer-tree
       (let ((tree (yaml-parse-tree (buffer-string))))
         (progn
@@ -51,6 +57,7 @@
           tree))))
 
 (defun yaml-pro--after-change-hook (_ _ _)
+  "Delete cached tree on buffer change."
   (setq yaml-pro-buffer-tree nil))
 
 (defun yaml-pro--get-parent-block* (tree point)
@@ -160,11 +167,13 @@
       (list beg end))))
 
 (defun yaml-pro-hide-overlay (ov)
+  "Put fold-related properties on overlay OV."
   (overlay-put ov 'invisible 'origami)
   (overlay-put ov 'display origami-fold-replacement)
   (overlay-put ov'face 'yaml-pro-fold-replacement-face))
 
 (defun yaml-pro-show-overlay (ov)
+  "Remove fold-related properties of overlay OV."
   (overlay-put ov 'invisible nil)
   (overlay-put ov 'display nil)
   (overlay-put ov 'face nil))
@@ -211,6 +220,7 @@
             (delete-overlay ov))))))))
 
 (defun yaml-pro-up-level ()
+  "Move the point to the parent tree."
   (interactive)
   (if (and (bolp) (not (looking-at "[ \n\t#]")))
       (goto-char (point-min))
@@ -232,6 +242,7 @@
         (yaml-pro-up-level)))))
 
 (defun yaml-pro-kill-subtree ()
+  "Kill the entire subtree located at the current point."
   (interactive)
   (let* ((parse-tree (yaml-pro--get-buffer-tree))
          (bounds (yaml-pro-get-block-bounds parse-tree (point)))
@@ -244,6 +255,7 @@
     (kill-region start end)))
 
 (defun yaml-pro-prev-subtree ()
+  "Move the point to the previous sibling subtree."
   (interactive)
   (let* ((start-pos (point))
          (parse-tree (yaml-pro--get-buffer-tree))
@@ -273,6 +285,7 @@
          t)))))
 
 (defun yaml-pro-next-subtree ()
+  "Move the point to the next sibling subtree."
   (interactive)
   (let* ((start-pos (point))
          (start-col (current-column))
@@ -307,8 +320,6 @@
     (delete-region (car prev-bounds) (cadr prev-bounds))
     (insert at-contents)
     (goto-char (car prev-bounds))))
-
-(defconst yaml-tree (yaml-parse-string-with-pos "a: b\nc:\n  d: x\ne: f"))
 
 (defun yaml-pro--search-location (tree point path)
   "Return path up to POINT of TREE having visited at PATH."
