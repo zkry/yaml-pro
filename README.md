@@ -1,5 +1,7 @@
 # yaml-pro: tools for editing YAML leveraging a parser
 
+![screenshot](./docs/screenshot.gif)
+
 *note: this package is still in beta. A lot could be done
 performance-wise to make it better.*
 
