@@ -28,6 +28,8 @@ have the following commands available (with default keybindings).
 - **yaml-pro-prev-subtree** (<kbd>C-c</kbd> <kbd>C-p</kbd>)
 - **yaml-pro-fold-at-point** (<kbd>C-c</kbd> <kbd>C-c</kbd>)
 - **yaml-pro-unfold-at-point** (<kbd>C-c</kbd> <kbd>C-o</kbd>)
+- **yaml-pro-move-subtree-up** (<kbd>s-<up></kbd>)
+- **yaml-pro-move-subtree-down** (<kbd>s-<down></kbd>)
 
 *This package being in beta, the default bindings are subject to change*
 

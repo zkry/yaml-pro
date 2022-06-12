@@ -323,6 +323,13 @@
     (insert at-contents)
     (goto-char (car prev-bounds))))
 
+(defun yaml-pro-move-subtree-down ()
+  "Swap the current subtree with the previous one."
+  (interactive)
+  (yaml-pro-next-subtree)
+  (yaml-pro-move-subtree-up)
+  (yaml-pro-next-subtree))
+
 (defun yaml-pro--search-location (tree point path)
   "Return path up to POINT of TREE having visited at PATH."
   (seq-find #'identity
@@ -366,7 +373,10 @@
       (define-key map (kbd "C-c C-n") #'yaml-pro-next-subtree)
 
       (define-key map (kbd "C-c C-c") #'yaml-pro-fold-at-point)
-      (define-key map (kbd "C-c C-o") #'yaml-pro-unfold-at-point))))
+      (define-key map (kbd "C-c C-o") #'yaml-pro-unfold-at-point)
+
+      (define-key map (kbd "s-<up>") #'yaml-pro-move-subtree-up)
+      (define-key map (kbd "s-<down>") #'yaml-pro-move-subtree-down))))
 
 (define-derived-mode yaml-pro-mode yaml-mode "YAML-pro"
   "Major mode providing  convenience functions for editing YAML."
