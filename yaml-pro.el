@@ -166,6 +166,23 @@
         nil
       (list beg end))))
 
+(defun yaml-pro--path-at-point ()
+  "Return the object path to current point."
+  ;; first look for current position
+  (let* ((parse (yaml-parse-string-with-pos (buffer-string)))
+         (path (yaml-pro--search-location parse (point) '())))
+    (seq-map
+     (lambda (s)
+       (set-text-properties 0 (length s) nil s)
+       s)
+     (or (nreverse path)
+         ;; if not found, go back before ":" and try again
+         (when (looking-back "[ \"a-zA-Z_-]+: +[ \"a-zA-Z_-]+" (- (point) 60))
+           (beginning-of-line)
+           (skip-chars-forward " ")
+           (let ((path (yaml-pro--search-location parse (point) '())))
+             (nreverse path)))))))
+
 (defun yaml-pro-hide-overlay (ov)
   "Put fold-related properties on overlay OV."
   (overlay-put ov 'invisible 'origami)
@@ -348,17 +365,6 @@
                    (yaml-pro--search-location val point (cons key path)))
                   (t nil))))
              tree)))
-
-(defun yaml-pro--path-at-point ()
-  "Return the object path to current point."
-  (let* ((parse (yaml-parse-string-with-pos (buffer-string)))
-         (path (yaml-pro--search-location parse (point) '())))
-    ;; first look for current position
-    (or (nreverse path)
-        (when (looking-back "[ \"a-zA-Z_-]+:[ \"a-zA-Z_-]+" (- (point) 60))
-          (beginning-of-line)
-          (let ((path (skip-chars-forward " " (yaml-pro--search-location parse (point) '()))))
-            (nreverse path))))))
 
 (defconst yaml-pro-mode-map
   (let ((map (make-sparse-keymap)))
