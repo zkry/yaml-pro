@@ -177,11 +177,12 @@
        s)
      (or (nreverse path)
          ;; if not found, go back before ":" and try again
-         (when (looking-back "[ \"a-zA-Z_-]+: +[ \"a-zA-Z_-]+" (- (point) 60))
-           (beginning-of-line)
-           (skip-chars-forward " ")
-           (let ((path (yaml-pro--search-location parse (point) '())))
-             (nreverse path)))))))
+         (save-excursion
+           (when (looking-back "[ \"a-zA-Z_-]+: +[ \"a-zA-Z_-]+" (- (point) 60))
+             (beginning-of-line)
+             (skip-chars-forward " ")
+             (let ((path (yaml-pro--search-location parse (point) '())))
+               (nreverse path))))))))
 
 (defun yaml-pro-hide-overlay (ov)
   "Put fold-related properties on overlay OV."
@@ -349,22 +350,36 @@
 
 (defun yaml-pro--search-location (tree point path)
   "Return path up to POINT of TREE having visited at PATH."
-  (seq-find #'identity
-            (seq-map
-             (lambda (tuple)
-               (let* ((key (car tuple))
-                      (key-pos (and (stringp key) (get-text-property 0 'yaml-position key)))
-                      (val (cdr tuple))
-                      (val-pos (and (stringp val) (get-text-property 0 'yaml-position val))))
-                 (cond
-                  ((and key-pos (<= (car key-pos) point (cdr key-pos)))
-                   path)
-                  ((and val-pos (<= (car val-pos) point (cdr val-pos)))
-                   (cons key path))
-                  ((listp val)
-                   (yaml-pro--search-location val point (cons key path)))
-                  (t nil))))
-             tree)))
+  (cond
+   ((stringp tree)
+    (let ((pos (get-text-property 0 'yaml-position tree)))
+      (when (<= (car pos) point (cdr pos))
+        path)))
+   (t
+    (seq-find #'identity
+              (seq-map
+               (lambda (tuple)
+                 (let* ((key (car tuple))
+                        (key-pos (and (stringp key) (get-text-property 0 'yaml-position key)))
+                        (val (cdr tuple))
+                        (val-pos (and (stringp val) (get-text-property 0 'yaml-position val))))
+                   (cond
+                    ((and key-pos (<= (car key-pos) point (cdr key-pos)))
+                     path)
+                    ((and val-pos (<= (car val-pos) point (cdr val-pos)))
+                     (cons key path))
+                    ((vectorp val)
+                     (catch 'found
+                       (dotimes (i (length val))
+                         (let* ((elt (aref val i))
+                                (res (yaml-pro--search-location elt point (cons (number-to-string i) (cons key path)))))
+                           (when res
+                             (throw 'found res))))
+                       nil))
+                    ((listp val)
+                     (yaml-pro--search-location val point (cons key path)))
+                    (t nil))))
+               tree)))))
 
 (defconst yaml-pro-mode-map
   (let ((map (make-sparse-keymap)))
@@ -384,9 +399,15 @@
       (define-key map (kbd "s-<up>") #'yaml-pro-move-subtree-up)
       (define-key map (kbd "s-<down>") #'yaml-pro-move-subtree-down))))
 
+(defun yaml-pro-mode-eldoc (callback)
+  "testing"
+  (string-join (yaml-pro--path-at-point) ": "))
+
 (define-derived-mode yaml-pro-mode yaml-mode "YAML-pro"
   "Major mode providing  convenience functions for editing YAML."
-  (add-hook 'after-change-functions #'yaml-pro--after-change-hook nil t))
+  (add-hook 'after-change-functions #'yaml-pro--after-change-hook nil t)
+  (add-hook 'eldoc-documentation-functions #'yaml-pro-mode-eldoc nil t)
+  )
 
 (provide 'yaml-pro)
 
