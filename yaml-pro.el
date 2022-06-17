@@ -393,7 +393,7 @@
       (define-key map (kbd "C-c C-p") #'yaml-pro-prev-subtree)
       (define-key map (kbd "C-c C-n") #'yaml-pro-next-subtree)
 
-      (define-key map (kbd "C-c C-c") #'yaml-pro-fold-at-point)
+      (define-key map (kbd "C-c C-f") #'yaml-pro-fold-at-point)
       (define-key map (kbd "C-c C-o") #'yaml-pro-unfold-at-point)
 
       (define-key map (kbd "s-<up>") #'yaml-pro-move-subtree-up)
