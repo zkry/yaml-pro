@@ -399,15 +399,19 @@
       (define-key map (kbd "s-<up>") #'yaml-pro-move-subtree-up)
       (define-key map (kbd "s-<down>") #'yaml-pro-move-subtree-down))))
 
-(defun yaml-pro-mode-eldoc (callback)
-  "testing"
-  (string-join (yaml-pro--path-at-point) ": "))
+;;;###autoload
+(define-minor-mode yaml-pro-mode
+  "Binds additional functions to aid in editing YAML files.
 
-(define-derived-mode yaml-pro-mode yaml-mode "YAML-pro"
-  "Major mode providing  convenience functions for editing YAML."
-  (add-hook 'after-change-functions #'yaml-pro--after-change-hook nil t)
-  (add-hook 'eldoc-documentation-functions #'yaml-pro-mode-eldoc nil t)
-  )
+\\{yaml-pro-mode-map}"
+  :init-value nil
+  :group 'yaml-pro
+  :keymap yaml-pro-mode-map
+  (if yaml-pro-mode
+      (progn
+        (when (equal mode-name "YAML")
+          (add-hook 'after-change-functions #'yaml-pro--after-change-hook nil t)))
+    (remove-hook 'after-change-functions #'yaml-pro--after-change-hook t)))
 
 (provide 'yaml-pro)
 
