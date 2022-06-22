@@ -1,9 +1,9 @@
-;;; yaml-pro.el --- slick yaml editing features -*- lexical-binding: t -*-
+;;; yaml-pro.el --- Parser-aided YAML editing features -*- lexical-binding: t -*-
 
 ;; Author: Zachary Romero
 ;; Maintainer: Zachary Romero
 ;; Version: 0.1.0
-;; Package-Requires: ((yaml "0.4.0"))
+;; Package-Requires: ((emacs "25.1") (yaml "0.4.0"))
 ;; Homepage: https://github.com/zkry/yaml-pro
 ;; Keywords: tools
 
@@ -167,7 +167,9 @@
       (list beg end))))
 
 (defun yaml-pro--path-at-point ()
-  "Return the object path to current point."
+  "Return the object path to current point.
+
+NOTE: This is an experimental feature."
   ;; first look for current position
   (let* ((parse (yaml-parse-string-with-pos (buffer-string)))
          (path (yaml-pro--search-location parse (point) '())))
@@ -247,8 +249,8 @@
            (bounds (yaml-pro-get-block-bounds parse-tree (point))))
       (goto-char (car bounds))
       (when (= start (point))
-        (let ((parse-tree (yaml-pro--get-buffer-tree))
-              (bounds (yaml-pro-get-parent-block parse-tree (point))))
+        (let* ((parse-tree (yaml-pro--get-buffer-tree))
+               (bounds (yaml-pro-get-parent-block parse-tree (point))))
           (goto-char (car bounds))
           (when (= start (point))
             ;; the block we're at and it's parent have the same start,
@@ -409,6 +411,8 @@
   :keymap yaml-pro-mode-map
   (if yaml-pro-mode
       (progn
+        (unless (fboundp 'yaml-parse-tree)
+          (error "Unsupported yaml.el version.  Ensure that yaml.el package installed and at version 0.4"))
         (when (equal mode-name "YAML")
           (add-hook 'after-change-functions #'yaml-pro--after-change-hook nil t)))
     (remove-hook 'after-change-functions #'yaml-pro--after-change-hook t)))
