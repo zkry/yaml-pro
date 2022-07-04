@@ -186,6 +186,27 @@ NOTE: This is an experimental feature."
              (let ((path (yaml-pro--search-location parse (point) '())))
                (nreverse path))))))))
 
+(defun yaml-pro--find-node (parse point)
+  (catch 'done
+   (cond
+    ((listp parse)
+     (dolist (item parse)
+       (let ((res (yaml-pro--find-node (cdr item) point)))
+         (when res
+           (throw 'done res)))))
+    ((stringp parse)
+     (let* ((bounds (get-text-property 0 'yaml-position parse))
+            (start (and bounds (1+ (car bounds))))
+            (end (and bounds (1+ (cdr bounds)))))
+       (if (<= start point end)
+           parse
+         nil))))))
+
+(defun yaml-pro--value-at-point ()
+  (let* ((parse (yaml-parse-string-with-pos (buffer-string)))
+         (val (yaml-pro--find-node parse (point))))
+    val))
+
 (defun yaml-pro-hide-overlay (ov)
   "Put fold-related properties on overlay OV."
   (overlay-put ov 'invisible 'origami)
@@ -197,6 +218,53 @@ NOTE: This is an experimental feature."
   (overlay-put ov 'invisible nil)
   (overlay-put ov 'display nil)
   (overlay-put ov 'face nil))
+
+(defconst yaml-pro-edit-mode-map
+  (let ((map (make-sparse-keymap)))
+    (prog1 map
+      ;;(suppress-keymap map)
+      (define-key map (kbd "C-c C-k") #'yaml-pro-edit-quit))))
+
+(defconst yaml-pro-edit-buffer-name "*yaml-pro-edit*")
+(defvar-local yaml-pro-edit-scalar nil)
+(defvar-local yaml-pro-edit-parent-buffer nil)
+
+(define-minor-mode yaml-pro-edit-mode
+  ""
+  :lighter " YAML-pro"
+  :keymap yaml-pro-edit-mode-map)
+
+(defun yaml-pro-edit-quit ()
+  ""
+  (interactive)
+  (unless yaml-pro-edit-mode
+    (user-error "not in yaml-pro edit buffer"))
+  (let ((b (current-buffer)))
+    (quit-window)
+    (kill-buffer b)))
+
+(defun yaml-pro-initialize-edit-buffer (parent-buffer buffer initial-text)
+  (with-current-buffer buffer
+    (unless yaml-pro-edit-mode
+      (yaml-pro-edit-mode))
+    (erase-buffer)
+    (setq-local yaml-pro-edit-parent-buffer parent-buffer)
+    (setq header-line-format
+          (substitute-command-keys "Edit, then exit with `\\[org-edit-src-exit]' or abort with \
+`\\[yaml-pro-edit-quit]'"))
+    (insert initial-text)))
+
+(defun yaml-pro-edit-scalar ()
+  "Edit the scalar value at the point in a separate buffer."
+  (interactive)
+  (let ((at-scalar (yaml-pro--value-at-point))
+        (parent-buffer (current-buffer)))
+    (unless at-scalar
+      (user-error "no value found at point"))
+    (setq yaml-pro-editing-scalar at-scalar)
+    (let ((b (get-buffer-create yaml-pro-special-buffer-name)))
+      (yaml-pro-initialize-edit-buffer parent-buffer b at-scalar)
+      (switch-to-buffer-other-window b))))
 
 (defun yaml-pro-fold-at-point ()
   "Fold YAML at point."
