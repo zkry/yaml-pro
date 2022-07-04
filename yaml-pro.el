@@ -223,7 +223,8 @@ NOTE: This is an experimental feature."
   (let ((map (make-sparse-keymap)))
     (prog1 map
       ;;(suppress-keymap map)
-      (define-key map (kbd "C-c C-k") #'yaml-pro-edit-quit))))
+      (define-key map (kbd "C-c C-k") #'yaml-pro-edit-quit)
+      (define-key map (kbd "C-c C-c") #'yaml-pro-edit-complete))))
 
 (defconst yaml-pro-edit-buffer-name "*yaml-pro-edit*")
 (defvar-local yaml-pro-edit-scalar nil)
@@ -243,6 +244,48 @@ NOTE: This is an experimental feature."
     (quit-window)
     (kill-buffer b)))
 
+(defun yaml-pro-infer-indent (&optional pos)
+  (let ((pos (or pos (point))))
+    (goto-char pos)
+    (forward-line 0)
+    (skip-chars-forward " \n")
+    (current-column)))
+
+(defun yaml-pro-edit-apply-indentation (content indent)
+  "Apply an indentation level of INDENT to the string CONTENT and return."
+  (with-temp-buffer
+    (insert content)
+    (goto-char (point-min))
+    (let ((indent-str (make-string indent ?\s)))
+      (while (not (eobp))
+        (when (not (looking-at-p "^ *\n"))
+          (insert indent-str))
+        (forward-line 1)))
+    (buffer-string)))
+
+(defun yaml-pro-edit-complete ()
+  ""
+  (interactive)
+  (unless yaml-pro-edit-mode
+    (user-error "not in yaml-pro edit buffer"))
+  (unless yaml-pro-edit-parent-buffer
+    (error "buffer not connected with yaml buffer"))
+  (let ((edit-buf (current-buffer))
+        (edit-str (buffer-substring-no-properties (point-min) (point-max))))
+    (save-excursion
+      (with-current-buffer yaml-pro-edit-parent-buffer
+        (let* ((pos (get-text-property 0 'yaml-position yaml-pro-edit-scalar))
+               (start (car pos))
+               (end (cdr pos))
+               (indent (yaml-pro-infer-indent start))
+               (indented-edit-str (yaml-pro-edit-apply-indentation edit-str (+ indent 2))))
+          (delete-region start end)
+          (goto-char start)
+          (insert " >-\n")
+          (insert indented-edit-str))))
+    (quit-window)
+    (kill-buffer edit-buf)))
+
 (defun yaml-pro-initialize-edit-buffer (parent-buffer buffer initial-text)
   (with-current-buffer buffer
     (unless yaml-pro-edit-mode
@@ -250,7 +293,7 @@ NOTE: This is an experimental feature."
     (erase-buffer)
     (setq-local yaml-pro-edit-parent-buffer parent-buffer)
     (setq header-line-format
-          (substitute-command-keys "Edit, then exit with `\\[org-edit-src-exit]' or abort with \
+          (substitute-command-keys "Edit, then exit with `\\[yaml-pro-edit-complete]' or abort with \
 `\\[yaml-pro-edit-quit]'"))
     (insert initial-text)))
 
@@ -261,7 +304,7 @@ NOTE: This is an experimental feature."
         (parent-buffer (current-buffer)))
     (unless at-scalar
       (user-error "no value found at point"))
-    (setq yaml-pro-editing-scalar at-scalar)
+    (setq yaml-pro-edit-scalar at-scalar)
     (let ((b (get-buffer-create yaml-pro-special-buffer-name)))
       (yaml-pro-initialize-edit-buffer parent-buffer b at-scalar)
       (switch-to-buffer-other-window b))))
@@ -467,7 +510,9 @@ NOTE: This is an experimental feature."
       (define-key map (kbd "C-c C-o") #'yaml-pro-unfold-at-point)
 
       (define-key map (kbd "s-<up>") #'yaml-pro-move-subtree-up)
-      (define-key map (kbd "s-<down>") #'yaml-pro-move-subtree-down))))
+      (define-key map (kbd "s-<down>") #'yaml-pro-move-subtree-down)
+
+      (define-key map (kbd "C-c '") #'yaml-pro-edit-scalar))))
 
 ;;;###autoload
 (define-minor-mode yaml-pro-mode
