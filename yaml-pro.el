@@ -230,6 +230,7 @@ NOTE: This is an experimental feature."
 (defvar-local yaml-pro-edit-scalar nil)
 (defvar-local yaml-pro-edit-scalar-overlay nil)
 (defvar-local yaml-pro-edit-parent-buffer nil)
+(defvar-local yaml-pro-edit-scalar-type nil)
 
 (define-minor-mode yaml-pro-edit-mode
   ""
@@ -301,7 +302,8 @@ NOTE: This is an experimental feature."
   (unless yaml-pro-edit-parent-buffer
     (error "buffer not connected with yaml buffer"))
   (let ((edit-buf (current-buffer))
-        (edit-str (buffer-substring-no-properties (point-min) (point-max))))
+        (edit-str (buffer-substring-no-properties (point-min) (point-max)))
+        (type yaml-pro-edit-scalar-type))
     (save-excursion
       (with-current-buffer yaml-pro-edit-parent-buffer
         (let* ((pos (get-text-property 0 'yaml-position yaml-pro-edit-scalar))
@@ -313,19 +315,34 @@ NOTE: This is an experimental feature."
           (yaml-pro-edit-cleanup-parent)
           (delete-region start end)
           (goto-char start)
-          (if (> indent 0)
-              (insert " >-2\n")
-            (insert " >-\n"))
-          (insert indented-edit-str))))
+          (cond ((or (eql type 'double)
+                     (and (= (length (string-lines edit-str)) 0)
+                          (string-prefix-p  " " edit-str)))
+                 (insert "\"" (string-replace "\"" "\\\""
+                                              (string-replace "\n" "\\n" edit-str))
+                         "\""))
+                ((eql type 'single)
+                 (insert "'" (string-replace "'" "''" edit-str) "'"))
+                ((or (eql type 'block)
+                     (> (length (string-lines edit-str)) 1))
+                 (if (> scalar-indent 0)
+                     (insert ">-2\n")
+                   (insert ">-\n"))
+                 (insert indented-edit-str))
+                (t
+                 (insert edit-str))))))
     (quit-window)
     (kill-buffer edit-buf)))
 
-(defun yaml-pro-initialize-edit-buffer (parent-buffer buffer initial-text)
+(defun yaml-pro-initialize-edit-buffer (parent-buffer buffer initial-text &optional type)
   (with-current-buffer buffer
     (unless yaml-pro-edit-mode
       (yaml-pro-edit-mode))
     (erase-buffer)
+    (setq-local require-final-newline nil)
     (setq-local yaml-pro-edit-parent-buffer parent-buffer)
+    (when type
+      (setq-local yaml-pro-edit-scalar-type type))
     (setq header-line-format
           (substitute-command-keys "Edit, then exit with `\\[yaml-pro-edit-complete]' or abort with \
 `\\[yaml-pro-edit-quit]'"))
@@ -336,7 +353,7 @@ NOTE: This is an experimental feature."
     (let ((indent-ct-num (progn (string-match "\\`[^\n]*\\([0-9]+\\) *\n" scalar-block-string)
                                 (let ((num-str (match-string 1 scalar-block-string)))
                                   (and num-str (+ (string-to-number num-str)
-                                                  yaml-indent)))))) 
+                                                  yaml-indent))))))
       (setq scalar-block-string (string-trim-left scalar-block-string ".*\n"))
       (with-temp-buffer
         (insert scalar-block-string)
@@ -363,9 +380,15 @@ NOTE: This is an experimental feature."
            (start (car bounds))
            (end (cdr bounds))
            (yaml-indent (yaml-pro-edit--infer-indent start))
+           (scalar-text (buffer-substring start end))
            (raw-scalar (yaml-pro-edit--extract-scalar-text
-                        (buffer-substring start end)
-                        yaml-indent)))
+                        scalar-text yaml-indent))
+           (block-p (string-match-p "\\` *\\(?:|\\|>\\)\\(?:+\\|-\\)?[0-9]*\n" scalar-text))
+           (double-quote-string-p (string-match-p "\\`\".*\"\\'" scalar-text))
+           (single-quote-string-p (string-match-p "\\`'.*'\\'" scalar-text))
+           (type (cond (block-p 'block)
+                       (single-quote-string-p 'single)
+                       (double-quote-string-p 'double))))
       ;; setup overlay and text properties
       (when yaml-pro-edit-scalar-overlay
         (delete-overlay yaml-pro-edit-scalar-overlay))
@@ -374,7 +397,9 @@ NOTE: This is an experimental feature."
           (setq yaml-pro-edit-scalar-overlay ov)
           (add-text-properties start end '(read-only t)))
       (let ((b (get-buffer-create yaml-pro-special-buffer-name)))
-        (yaml-pro-initialize-edit-buffer parent-buffer b raw-scalar)
+        (if block-p
+            (yaml-pro-initialize-edit-buffer parent-buffer b raw-scalar type)
+          (yaml-pro-initialize-edit-buffer parent-buffer b at-scalar type))
         (switch-to-buffer-other-window b)))))
 
 (defun yaml-pro-fold-at-point ()
