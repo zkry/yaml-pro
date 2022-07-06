@@ -228,6 +228,7 @@ NOTE: This is an experimental feature."
 
 (defconst yaml-pro-edit-buffer-name "*yaml-pro-edit*")
 (defvar-local yaml-pro-edit-scalar nil)
+(defvar-local yaml-pro-edit-scalar-overlay nil)
 (defvar-local yaml-pro-edit-parent-buffer nil)
 
 (define-minor-mode yaml-pro-edit-mode
@@ -235,21 +236,50 @@ NOTE: This is an experimental feature."
   :lighter " YAML-pro"
   :keymap yaml-pro-edit-mode-map)
 
-(defun yaml-pro-edit-quit ()
-  ""
-  (interactive)
-  (unless yaml-pro-edit-mode
-    (user-error "not in yaml-pro edit buffer"))
-  (let ((b (current-buffer)))
-    (quit-window)
-    (kill-buffer b)))
+(defun yaml-pro-edit-cleanup-parent ()
+  "Remove overlay and properties of edited text."
+  (with-current-buffer (or yaml-pro-edit-parent-buffer (current-buffer))
+    (when yaml-pro-edit-scalar-overlay
+      (let ((start (overlay-start yaml-pro-edit-scalar-overlay))
+            (end (overlay-end yaml-pro-edit-scalar-overlay))
+            (inhibit-read-only t))
+        (remove-text-properties start end '(read-only t)))
+      (delete-overlay yaml-pro-edit-scalar-overlay)
+      (setq yaml-pro-edit-scalar-overlay nil))))
 
-(defun yaml-pro-infer-indent (&optional pos)
+(defun yaml-pro-edit--infer-scalar-indent (scalar-block-string)
+  (with-temp-buffer
+    (insert scalar-block-string)
+    (goto-char (point-min))
+    (save-excursion
+      (let ((min-indent 10000))
+        (while (not (eobp))
+          (when (not (looking-at " *\n"))
+            (let ((ct 0))
+              (while (looking-at-p " ")
+                (forward-char 1)
+                (cl-incf ct))
+              (when (< ct min-indent)
+                (setq min-indent ct))))
+          (forward-line 1))
+        min-indent))))
+
+(defun yaml-pro-edit--infer-indent (&optional pos)
   (let ((pos (or pos (point))))
     (goto-char pos)
     (forward-line 0)
     (skip-chars-forward " \n")
     (current-column)))
+
+(defun yaml-pro-edit-quit ()
+  ""
+  (interactive)
+  (unless yaml-pro-edit-mode
+    (user-error "not in yaml-pro edit buffer"))
+  (yaml-pro-edit-cleanup-parent)
+  (let ((b (current-buffer)))
+    (quit-window)
+    (kill-buffer b)))
 
 (defun yaml-pro-edit-apply-indentation (content indent)
   "Apply an indentation level of INDENT to the string CONTENT and return."
@@ -277,11 +307,15 @@ NOTE: This is an experimental feature."
         (let* ((pos (get-text-property 0 'yaml-position yaml-pro-edit-scalar))
                (start (car pos))
                (end (cdr pos))
-               (indent (yaml-pro-infer-indent start))
+               (indent (yaml-pro-edit--infer-indent start))
+               (scalar-indent (yaml-pro-edit--infer-scalar-indent edit-str))
                (indented-edit-str (yaml-pro-edit-apply-indentation edit-str (+ indent 2))))
+          (yaml-pro-edit-cleanup-parent)
           (delete-region start end)
           (goto-char start)
-          (insert " >-\n")
+          (if (> indent 0)
+              (insert " >-2\n")
+            (insert " >-\n"))
           (insert indented-edit-str))))
     (quit-window)
     (kill-buffer edit-buf)))
@@ -297,6 +331,26 @@ NOTE: This is an experimental feature."
 `\\[yaml-pro-edit-quit]'"))
     (insert initial-text)))
 
+(defun yaml-pro-edit--extract-scalar-text (scalar-block-string yaml-indent)
+  (save-match-data
+    (let ((indent-ct-num (progn (string-match "\\`[^\n]*\\([0-9]+\\) *\n" scalar-block-string)
+                                (let ((num-str (match-string 1 scalar-block-string)))
+                                  (and num-str (+ (string-to-number num-str)
+                                                  yaml-indent)))))) 
+      (setq scalar-block-string (string-trim-left scalar-block-string ".*\n"))
+      (with-temp-buffer
+        (insert scalar-block-string)
+        (goto-char (point-min))
+        (let* ((indentation (or indent-ct-num
+                                (yaml-pro-edit--infer-scalar-indent scalar-block-string)))
+               (indentation-regexp
+                (regexp-quote (make-string indentation ?\s))))
+          (while (not (eobp))
+            (when (looking-at-p indentation-regexp)
+              (delete-char indentation))
+            (forward-line 1)))
+        (buffer-string)))))
+
 (defun yaml-pro-edit-scalar ()
   "Edit the scalar value at the point in a separate buffer."
   (interactive)
@@ -305,9 +359,23 @@ NOTE: This is an experimental feature."
     (unless at-scalar
       (user-error "no value found at point"))
     (setq yaml-pro-edit-scalar at-scalar)
-    (let ((b (get-buffer-create yaml-pro-special-buffer-name)))
-      (yaml-pro-initialize-edit-buffer parent-buffer b at-scalar)
-      (switch-to-buffer-other-window b))))
+    (let* ((bounds (get-text-property 0 'yaml-position at-scalar))
+           (start (car bounds))
+           (end (cdr bounds))
+           (yaml-indent (yaml-pro-edit--infer-indent start))
+           (raw-scalar (yaml-pro-edit--extract-scalar-text
+                        (buffer-substring start end)
+                        yaml-indent)))
+      ;; setup overlay and text properties
+      (when yaml-pro-edit-scalar-overlay
+        (delete-overlay yaml-pro-edit-scalar-overlay))
+      (let ((ov (make-overlay start end)))
+          (overlay-put ov 'face 'secondary-selection)
+          (setq yaml-pro-edit-scalar-overlay ov)
+          (add-text-properties start end '(read-only t)))
+      (let ((b (get-buffer-create yaml-pro-special-buffer-name)))
+        (yaml-pro-initialize-edit-buffer parent-buffer b raw-scalar)
+        (switch-to-buffer-other-window b)))))
 
 (defun yaml-pro-fold-at-point ()
   "Fold YAML at point."
