@@ -224,13 +224,15 @@ NOTE: This is an experimental feature."
     (prog1 map
       ;;(suppress-keymap map)
       (define-key map (kbd "C-c C-k") #'yaml-pro-edit-quit)
-      (define-key map (kbd "C-c C-c") #'yaml-pro-edit-complete))))
+      (define-key map (kbd "C-c C-c") #'yaml-pro-edit-complete)
+      (define-key map (kbd "C-c C-s") #'yaml-pro-edit-change-output))))
 
 (defconst yaml-pro-edit-buffer-name "*yaml-pro-edit*")
 (defvar-local yaml-pro-edit-scalar nil)
 (defvar-local yaml-pro-edit-scalar-overlay nil)
 (defvar-local yaml-pro-edit-parent-buffer nil)
-(defvar-local yaml-pro-edit-scalar-type nil)
+
+(defvar-local yaml-pro-edit-output-type nil)
 
 (define-minor-mode yaml-pro-edit-mode
   ""
@@ -272,6 +274,34 @@ NOTE: This is an experimental feature."
     (skip-chars-forward " \n")
     (current-column)))
 
+(defconst yaml-pro-edit-output-types
+  '(("| (keep newlines, single newline at end)" . literal)
+    ("|- (keep newlines, strip newlines at end)" . literal-strip)
+    ("|+ (keep newlines, keep newlines at end)" . literal-keep)
+    ("> (fold newlines to space, single newline at end)" . folded)
+    (">- (fold newlines to space, strip newlines at end)" . folded-strip)
+    (">+ (fold newlines to space, keep newlines at end)" . folded-keep)
+    ("' (nothing escaped)"  . single)
+    ("\" (newlines escaped)" . double)))
+
+(defun yaml-pro-edit--block-output (type)
+  (cdr (assoc type '((literal . "|")
+                     (literal-strip . "|-")
+                     (literal-keep . "|+")
+                     (folded . ">")
+                     (folded-strip . ">-")
+                     (folded-keep . ">+")))))
+
+(defun yaml-pro-edit-change-output ()
+  ""
+  (interactive)
+  (unless yaml-pro-edit-mode
+    (user-error "not in yaml-pro edit buffer"))
+  (let* ((output-type (completing-read "Output: " yaml-pro-edit-output-types))
+         (key (cdr (assoc output-type yaml-pro-edit-output-types 'equal))))
+    (setq yaml-pro-edit-output-type key)
+    (setq header-line-format (yaml-pro-edit--header-line))))
+
 (defun yaml-pro-edit-quit ()
   ""
   (interactive)
@@ -303,7 +333,7 @@ NOTE: This is an experimental feature."
     (error "buffer not connected with yaml buffer"))
   (let ((edit-buf (current-buffer))
         (edit-str (buffer-substring-no-properties (point-min) (point-max)))
-        (type yaml-pro-edit-scalar-type))
+        (type yaml-pro-edit-output-type))
     (save-excursion
       (with-current-buffer yaml-pro-edit-parent-buffer
         (let* ((pos (get-text-property 0 'yaml-position yaml-pro-edit-scalar))
@@ -311,28 +341,51 @@ NOTE: This is an experimental feature."
                (end (cdr pos))
                (indent (yaml-pro-edit--infer-indent start))
                (scalar-indent (yaml-pro-edit--infer-scalar-indent edit-str))
-               (indented-edit-str (yaml-pro-edit-apply-indentation edit-str (+ indent 2))))
+               (indented-edit-str (yaml-pro-edit-apply-indentation edit-str (+ indent 2)))
+               (block-header (or (yaml-pro-edit--block-output type)
+                                 (and (not type)
+                                      (> (length (string-lines edit-str)) 1)
+                                      ">-"))))
           (yaml-pro-edit-cleanup-parent)
           (delete-region start end)
           (goto-char start)
-          (cond ((or (eql type 'double)
-                     (and (= (length (string-lines edit-str)) 0)
-                          (string-prefix-p  " " edit-str)))
+          (cond (block-header
+                 (if (> scalar-indent 0)
+                     (insert block-header "2\n")
+                   (insert block-header "\n"))
+                 (insert indented-edit-str))
+                ((or (eql type 'double)
+                     (and (not type)
+                          (and (= (length (string-lines edit-str)) 1)
+                               (string-prefix-p  " " edit-str))))
                  (insert "\"" (string-replace "\"" "\\\""
                                               (string-replace "\n" "\\n" edit-str))
                          "\""))
                 ((eql type 'single)
                  (insert "'" (string-replace "'" "''" edit-str) "'"))
-                ((or (eql type 'block)
-                     (> (length (string-lines edit-str)) 1))
-                 (if (> scalar-indent 0)
-                     (insert ">-2\n")
-                   (insert ">-\n"))
-                 (insert indented-edit-str))
                 (t
                  (insert edit-str))))))
     (quit-window)
     (kill-buffer edit-buf)))
+
+(defun yaml-pro-edit--header-line ()
+  (let* ((base-text (substitute-command-keys "Edit, then exit with \
+`\\[yaml-pro-edit-complete]' or abort with `\\[yaml-pro-edit-quit]'"))
+         )
+    (if yaml-pro-edit-output-type
+             (let* ((type-str
+                     (or (yaml-pro-edit--block-output yaml-pro-edit-output-type)
+                         (and (eql yaml-pro-edit-output-type 'double) "\"\"")
+                         (and (eql yaml-pro-edit-output-type 'single) "'")))
+                    (type-str-prp (propertize type-str 'face 'font-lock-string-face)))
+               (concat base-text
+                       ". Outputting "
+                       type-str-prp
+                       (substitute-command-keys
+                        ", `\\[yaml-pro-edit-change-output]' to change")))
+           (concat base-text
+                   (substitute-command-keys
+                    ". Change output with `\\[yaml-pro-edit-change-output]'")))))
 
 (defun yaml-pro-initialize-edit-buffer (parent-buffer buffer initial-text &optional type)
   (with-current-buffer buffer
@@ -341,11 +394,9 @@ NOTE: This is an experimental feature."
     (erase-buffer)
     (setq-local require-final-newline nil)
     (setq-local yaml-pro-edit-parent-buffer parent-buffer)
-    (when type
-      (setq-local yaml-pro-edit-scalar-type type))
-    (setq header-line-format
-          (substitute-command-keys "Edit, then exit with `\\[yaml-pro-edit-complete]' or abort with \
-`\\[yaml-pro-edit-quit]'"))
+    (setq-local yaml-pro-edit-output-type nil)
+    (when type (setq-local yaml-pro-edit-output-type type))
+    (setq header-line-format (yaml-pro-edit--header-line))
     (insert initial-text)))
 
 (defun yaml-pro-edit--extract-scalar-text (scalar-block-string yaml-indent)
@@ -383,10 +434,18 @@ NOTE: This is an experimental feature."
            (scalar-text (buffer-substring start end))
            (raw-scalar (yaml-pro-edit--extract-scalar-text
                         scalar-text yaml-indent))
-           (block-p (string-match-p "\\` *\\(?:|\\|>\\)\\(?:+\\|-\\)?[0-9]*\n" scalar-text))
+           (folded-block-p (string-match-p "\\` *>\\(?:+\\|-\\)?[0-9]*\n" scalar-text))
+           (literal-block-p (string-match-p "\\` *|\\(?:+\\|-\\)?[0-9]*\n" scalar-text))
+           (strip-p (string-match-p "\\` *.-[0-9]*\n" scalar-text))
+           (keep-p (string-match-p "\\` *.\\+[0-9]*\n" scalar-text))
            (double-quote-string-p (string-match-p "\\`\".*\"\\'" scalar-text))
            (single-quote-string-p (string-match-p "\\`'.*'\\'" scalar-text))
-           (type (cond (block-p 'block)
+           (type (cond ((and folded-block-p strip-p) 'folded-strip)
+                       ((and literal-block-p strip-p) 'literal-strip)
+                       ((and folded-block-p keep-p) 'folded-keep)
+                       ((and literal-block-p keep-p) 'literal-keep)
+                       (folded-block-p 'folded)
+                       (literal-block-p 'literal)
                        (single-quote-string-p 'single)
                        (double-quote-string-p 'double))))
       ;; setup overlay and text properties
@@ -397,8 +456,10 @@ NOTE: This is an experimental feature."
           (setq yaml-pro-edit-scalar-overlay ov)
           (add-text-properties start end '(read-only t)))
       (let ((b (get-buffer-create yaml-pro-special-buffer-name)))
-        (if block-p
+        (if (or folded-block-p literal-block-p)
+            ;; we need to pass the text in buffer if type is block 
             (yaml-pro-initialize-edit-buffer parent-buffer b raw-scalar type)
+          ;; otherwise use its scalar value (to not show quotes)
           (yaml-pro-initialize-edit-buffer parent-buffer b at-scalar type))
         (switch-to-buffer-other-window b)))))
 
