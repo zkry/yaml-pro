@@ -312,12 +312,14 @@ NOTE: This is an experimental feature."
     (quit-window)
     (kill-buffer b)))
 
-(defun yaml-pro-edit-apply-indentation (content indent)
+(defun yaml-pro-edit-apply-indentation (content indent &optional type)
   "Apply an indentation level of INDENT to the string CONTENT and return."
   (with-temp-buffer
     (insert content)
     (goto-char (point-min))
     (let ((indent-str (make-string indent ?\s)))
+      (when (eql type 'single)
+        (forward-line 1))
       (while (not (eobp))
         (when (not (looking-at-p "^ *\n"))
           (insert indent-str))
@@ -341,7 +343,7 @@ NOTE: This is an experimental feature."
                (end (cdr pos))
                (indent (yaml-pro-edit--infer-indent start))
                (scalar-indent (yaml-pro-edit--infer-scalar-indent edit-str))
-               (indented-edit-str (yaml-pro-edit-apply-indentation edit-str (+ indent 2)))
+               (indented-edit-str (yaml-pro-edit-apply-indentation edit-str (+ indent 2) type))
                (block-header (or (yaml-pro-edit--block-output type)
                                  (and (not type)
                                       (> (length (string-lines edit-str)) 1)
@@ -362,7 +364,7 @@ NOTE: This is an experimental feature."
                                               (string-replace "\n" "\\n" edit-str))
                          "\""))
                 ((eql type 'single)
-                 (insert "'" (string-replace "'" "''" edit-str) "'"))
+                 (insert "'" (string-replace "'" "''" indented-edit-str) "'"))
                 (t
                  (insert edit-str))))))
     (quit-window)
@@ -373,19 +375,19 @@ NOTE: This is an experimental feature."
 `\\[yaml-pro-edit-complete]' or abort with `\\[yaml-pro-edit-quit]'"))
          )
     (if yaml-pro-edit-output-type
-             (let* ((type-str
-                     (or (yaml-pro-edit--block-output yaml-pro-edit-output-type)
-                         (and (eql yaml-pro-edit-output-type 'double) "\"\"")
-                         (and (eql yaml-pro-edit-output-type 'single) "'")))
-                    (type-str-prp (propertize type-str 'face 'font-lock-string-face)))
-               (concat base-text
-                       ". Outputting "
-                       type-str-prp
-                       (substitute-command-keys
-                        ", `\\[yaml-pro-edit-change-output]' to change")))
-           (concat base-text
-                   (substitute-command-keys
-                    ". Change output with `\\[yaml-pro-edit-change-output]'")))))
+        (let* ((type-str
+                (or (yaml-pro-edit--block-output yaml-pro-edit-output-type)
+                    (and (eql yaml-pro-edit-output-type 'double) "\"\"")
+                    (and (eql yaml-pro-edit-output-type 'single) "''")))
+               (type-str-prp (propertize type-str 'face 'font-lock-string-face)))
+          (concat base-text
+                  ". Outputting "
+                  type-str-prp
+                  (substitute-command-keys
+                   ", `\\[yaml-pro-edit-change-output]' to change")))
+      (concat base-text
+              (substitute-command-keys
+               ". Change output with `\\[yaml-pro-edit-change-output]'")))))
 
 (defun yaml-pro-initialize-edit-buffer (parent-buffer buffer initial-text &optional type)
   (with-current-buffer buffer
