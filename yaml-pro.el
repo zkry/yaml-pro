@@ -399,7 +399,11 @@ NOTE: This is an experimental feature."
     (setq-local yaml-pro-edit-output-type nil)
     (when type (setq-local yaml-pro-edit-output-type type))
     (setq header-line-format (yaml-pro-edit--header-line))
-    (insert initial-text)))
+    (insert initial-text)
+    (when (memq type '(folded-strip literal-strip))
+      (save-excursion
+        (goto-char (point-max))
+        (delete-char -1)))))
 
 (defun yaml-pro-edit--extract-scalar-text (scalar-block-string yaml-indent)
   (save-match-data
