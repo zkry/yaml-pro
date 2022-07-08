@@ -243,10 +243,6 @@ NOTE: This is an experimental feature."
   "Remove overlay and properties of edited text."
   (with-current-buffer (or yaml-pro-edit-parent-buffer (current-buffer))
     (when yaml-pro-edit-scalar-overlay
-      (let ((start (overlay-start yaml-pro-edit-scalar-overlay))
-            (end (overlay-end yaml-pro-edit-scalar-overlay))
-            (inhibit-read-only t))
-        (remove-text-properties start end '(read-only t)))
       (delete-overlay yaml-pro-edit-scalar-overlay)
       (setq yaml-pro-edit-scalar-overlay nil))))
 
@@ -275,29 +271,39 @@ NOTE: This is an experimental feature."
     (current-column)))
 
 (defconst yaml-pro-edit-output-types
-  '(("| (keep newlines, single newline at end)" . literal)
-    ("|- (keep newlines, strip newlines at end)" . literal-strip)
-    ("|+ (keep newlines, keep newlines at end)" . literal-keep)
-    ("> (fold newlines to space, single newline at end)" . folded)
-    (">- (fold newlines to space, strip newlines at end)" . folded-strip)
-    (">+ (fold newlines to space, keep newlines at end)" . folded-keep)
-    ("' (nothing escaped)"  . single)
-    ("\" (newlines escaped)" . double)))
+  '(("|" . literal)
+    ("|-" . literal-strip)
+    ("|+" . literal-keep)
+    (">" . folded)
+    (">-" . folded-strip)
+    (">+" . folded-keep)
+    ("'"  . single)
+    ("\"" . double)))
+
+(defun yaml-pro-edit--block-style-annotation (v)
+  (let ((annotations
+         '(("|" . "keep newlines, single newline at end")
+           ("|-" . "keep newlines, strip newlines at end")
+           ("|+" . "keep newlines, keep newlines at end")
+           (">" . "fold newlines to space, single newline at end")
+           (">-" . "fold newlines to space, strip newlines at end")
+           (">+" . "fold newlines to space, keep newlines at end")
+           ("'" . "nothing escaped")
+           ("\"" . "newlines escaped"))))
+    (concat " " (cdr (assoc v annotations)))))
 
 (defun yaml-pro-edit--block-output (type)
-  (cdr (assoc type '((literal . "|")
-                     (literal-strip . "|-")
-                     (literal-keep . "|+")
-                     (folded . ">")
-                     (folded-strip . ">-")
-                     (folded-keep . ">+")))))
+  (when (not (memq type '(single double)))
+    (car (rassoc type yaml-pro-edit-output-types))))
 
 (defun yaml-pro-edit-change-output ()
   ""
   (interactive)
   (unless yaml-pro-edit-mode
     (user-error "not in yaml-pro edit buffer"))
-  (let* ((output-type (completing-read "Output: " yaml-pro-edit-output-types))
+  (let* ((completion-extra-properties
+          '(:annotation-function yaml-pro-edit--block-style-annotation))
+         (output-type (completing-read "Output: " yaml-pro-edit-output-types))
          (key (cdr (assoc output-type yaml-pro-edit-output-types 'equal))))
     (setq yaml-pro-edit-output-type key)
     (setq header-line-format (yaml-pro-edit--header-line))))
@@ -431,7 +437,7 @@ NOTE: This is an experimental feature."
   (let ((at-scalar (yaml-pro--value-at-point))
         (parent-buffer (current-buffer)))
     (unless at-scalar
-      (user-error "no value found at point"))
+      (user-error "No value found at point"))
     (setq yaml-pro-edit-scalar at-scalar)
     (let* ((bounds (get-text-property 0 'yaml-position at-scalar))
            (start (car bounds))
@@ -445,7 +451,7 @@ NOTE: This is an experimental feature."
            (strip-p (string-match-p "\\` *.-[0-9]*\n" scalar-text))
            (keep-p (string-match-p "\\` *.\\+[0-9]*\n" scalar-text))
            (double-quote-string-p (string-match-p "\\`\".*\"\\'" scalar-text))
-           (single-quote-string-p (string-match-p "\\`'.*'\\'" scalar-text))
+           (single-quote-string-p (string-match-p "\\`'\\(.\\|\n\\)*'\\'" scalar-text))
            (type (cond ((and folded-block-p strip-p) 'folded-strip)
                        ((and literal-block-p strip-p) 'literal-strip)
                        ((and folded-block-p keep-p) 'folded-keep)
@@ -457,13 +463,19 @@ NOTE: This is an experimental feature."
       ;; setup overlay and text properties
       (when yaml-pro-edit-scalar-overlay
         (delete-overlay yaml-pro-edit-scalar-overlay))
-      (let ((ov (make-overlay start end)))
-          (overlay-put ov 'face 'secondary-selection)
-          (setq yaml-pro-edit-scalar-overlay ov)
-          (add-text-properties start end '(read-only t)))
+      (let ((ov (make-overlay start end))
+            (read-only
+	         (list
+	          (lambda (&rest _)
+	            (user-error "Can't modify an scalar being edited in a dedicated buffer")))))
+        (overlay-put ov 'modification-hooks read-only)
+        (overlay-put ov 'insert-in-front-hooks read-only)
+        (overlay-put ov 'insert-behind-hooks read-only)
+        (overlay-put ov 'face 'secondary-selection)
+        (setq yaml-pro-edit-scalar-overlay ov))
       (let ((b (get-buffer-create yaml-pro-special-buffer-name)))
         (if (or folded-block-p literal-block-p)
-            ;; we need to pass the text in buffer if type is block 
+            ;; we need to pass the text in buffer if type is block
             (yaml-pro-initialize-edit-buffer parent-buffer b raw-scalar type)
           ;; otherwise use its scalar value (to not show quotes)
           (yaml-pro-initialize-edit-buffer parent-buffer b at-scalar type))
