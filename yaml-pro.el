@@ -436,13 +436,17 @@ NOTE: This is an experimental feature."
             (forward-line 1)))
         (buffer-string)))))
 
-(defun yaml-pro-edit-scalar ()
-  "Edit the scalar value at the point in a separate buffer."
-  (interactive)
-  (let ((at-scalar (yaml-pro--value-at-point))
+(defun yaml-pro-edit-scalar (p)
+  "Edit the scalar value at the point in a separate buffer.
+If prefix argument P is provided, prompt user for initialization command."
+  (interactive "p")
+  (let ((init-func)
+        (at-scalar (yaml-pro--value-at-point))
         (parent-buffer (current-buffer)))
     (unless at-scalar
       (user-error "No value found at point"))
+    (when (= 4 p)
+      (setq init-func (read-command "Initialization command: ")))
     (setq yaml-pro-edit-scalar at-scalar)
     (let* ((bounds (get-text-property 0 'yaml-position at-scalar))
            (start (car bounds))
@@ -481,9 +485,9 @@ NOTE: This is an experimental feature."
       (let ((b (get-buffer-create yaml-pro-special-buffer-name)))
         (if (or folded-block-p literal-block-p)
             ;; we need to pass the text in buffer if type is block
-            (yaml-pro-initialize-edit-buffer parent-buffer b raw-scalar type)
+            (yaml-pro-initialize-edit-buffer parent-buffer b raw-scalar type init-func)
           ;; otherwise use its scalar value (to not show quotes)
-          (yaml-pro-initialize-edit-buffer parent-buffer b at-scalar type))
+          (yaml-pro-initialize-edit-buffer parent-buffer b at-scalar type init-func))
         (switch-to-buffer-other-window b)))))
 
 (defun yaml-pro-fold-at-point ()
