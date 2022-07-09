@@ -395,8 +395,13 @@ NOTE: This is an experimental feature."
               (substitute-command-keys
                ". Change output with `\\[yaml-pro-edit-change-output]'")))))
 
-(defun yaml-pro-initialize-edit-buffer (parent-buffer buffer initial-text &optional type)
+(defun yaml-pro-initialize-edit-buffer (parent-buffer buffer initial-text &optional type initialize)
   (with-current-buffer buffer
+    (when (functionp initialize)
+      (condition-case e
+          (funcall initialize)
+        (error (message "Initialization failed with: %S"
+                        (error-message-string e)))))
     (unless yaml-pro-edit-mode
       (yaml-pro-edit-mode))
     (erase-buffer)
