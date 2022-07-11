@@ -33,6 +33,10 @@ have the following commands available (with default keybindings).
 
 *The default bindings are subject to change as this package is in beta*
 
+# Demos
+
+![screenshot](./docs/yaml-pro-jump.gif)
+
 # Roadmap
 
 - [x] Edit yaml values in separate buffer (like org-edit-special)

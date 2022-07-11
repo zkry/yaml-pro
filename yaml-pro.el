@@ -274,7 +274,7 @@ NOTE: This is an experimental feature."
 (defun yaml-pro--get-last-yaml-pos (str)
   (let ((i (1- (length str)))
         (pos))
-    (while (or (not pos) (< i 0))
+    (while (and (not pos) (>= i 0))
       (let ((at-pos (get-text-property i 'yaml-position str)))
         (when at-pos
           (setq pos at-pos))
