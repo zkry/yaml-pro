@@ -1,6 +1,7 @@
 # yaml-pro: tools for editing YAML leveraging a parser
 
 ![screenshot](./docs/screenshot1.gif)
+![jumping feature](./docs/yaml-pro-jump.gif)
 
 yaml-pro is a package that provides conveniences for editing yaml.  It
 utilizes the YAML parser at https://github.com/zkry/yaml.el to obtain
