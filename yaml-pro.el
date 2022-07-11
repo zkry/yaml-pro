@@ -292,6 +292,52 @@ NOTE: This is an experimental feature."
          (pos (yaml-pro--get-last-yaml-pos original-str)))
     (goto-char (car pos))))
 
+(defun consult--yaml-pro-jump-preview (paths)
+  (let ((invisible)
+        (overlays)
+        (saved-pos (point-marker))
+        (saved-min (point-min-marker))
+        (saved-max (point-max-marker)))
+    (lambda (cand restore)
+      (mapc #'funcall invisible)
+      (mapc #'delete-overlay overlays)
+      (cond
+       (restore
+        (let ((saved-buffer (marker-buffer saved-pos)))
+          (set-buffer saved-buffer)
+          (narrow-to-region saved-min saved-max)
+          (goto-char saved-pos)))
+       (cand
+        (let ((pos (and (not (string-blank-p cand)) (yaml-pro--get-last-yaml-pos cand))))
+          (when pos
+            (widen)
+            (goto-char (car pos))
+            (run-hooks 'consult-after-jump-hook)
+            (setq invisible (consult--invisible-open-temporarily)
+                  overlays
+                  (list (consult--overlay (car pos) (cdr pos)
+                                          'face 'consult-preview-cursor
+                                          'window (selected-window)))))))))))
+
+(defun consult-yaml-pro-jump ()
+  "Jump to a specified path."
+  (interactive)
+  (let* ((tree (yaml-parse-string-with-pos (buffer-string)))
+         (paths (yaml-pro--extract-paths tree))
+         (sorted-paths (seq-sort-by (lambda (path) (car (yaml-pro--get-last-yaml-pos path)))
+                                    #'< paths))
+         (selected (consult--read
+                    paths
+                    :prompt "Jump to: "
+                    :history 'yaml-pro-jump
+                    :require-match t
+                    :sort nil
+                    :state (let ((preview (consult--yaml-pro-jump-preview paths)))
+                             (lambda (str restore)
+                               (funcall preview str restore)))))
+         (original-str (seq-find (lambda (s) (string= s selected)) paths)))
+    (goto-char (car (yaml-pro--get-last-yaml-pos original-str)))))
+
 (defun yaml-pro-fold-at-point ()
   "Fold YAML at point."
   (interactive)
@@ -462,7 +508,11 @@ NOTE: This is an experimental feature."
       (define-key map (kbd "s-<up>") #'yaml-pro-move-subtree-up)
       (define-key map (kbd "s-<down>") #'yaml-pro-move-subtree-down)
 
-      (define-key map (kbd "C-c '") #'yaml-pro-edit-scalar))))
+      (define-key map (kbd "C-c '") #'yaml-pro-edit-scalar)
+
+      (define-key map (kbd "C-c C-j") (if (featurep 'consult)
+                                          #'consult-yaml-pro-jump
+                                        #'yaml-pro-jump)))))
 
 (defconst yaml-pro-required-yaml-parser-version "0.5.1")
 
