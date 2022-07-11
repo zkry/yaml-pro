@@ -39,7 +39,8 @@ have the following commands available (with default keybindings).
 
 - [x] Edit yaml values in separate buffer (like org-edit-special)
   - [x] block options for how to store the string.
-  - [ ] save default init command on a path basis
+  - [x] save default init command on a path basis
+- [x] Easy navigation (yaml-pro-jump)
 - [ ] Async parsing: preemptively parse document for faster editing
       (perhaps via idle timer).
 - [ ] Tools to work with various template modes.  Go-templated YAML is
