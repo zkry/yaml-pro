@@ -168,6 +168,39 @@
         nil
       (list beg end))))
 
+(defun yaml-pro--search-location (tree point path)
+  "Return path up to POINT of TREE having visited at PATH."
+  (cond
+   ((stringp tree)
+    (let ((pos (get-text-property 0 'yaml-position tree)))
+      (when (<= (car pos) point (cdr pos))
+        path)))
+   (t
+    (seq-find #'identity
+              (seq-map
+               (lambda (tuple)
+                 (let* ((key (car tuple))
+                        (key-pos (and (stringp key) (get-text-property 0 'yaml-position key)))
+                        (val (cdr tuple))
+                        (val-pos (and (stringp val) (get-text-property 0 'yaml-position val))))
+                   (cond
+                    ((and key-pos (<= (car key-pos) point (cdr key-pos)))
+                     path)
+                    ((and val-pos (<= (car val-pos) point (cdr val-pos)))
+                     (cons key path))
+                    ((vectorp val)
+                     (catch 'found
+                       (dotimes (i (length val))
+                         (let* ((elt (aref val i))
+                                (res (yaml-pro--search-location elt point (cons (number-to-string i) (cons key path)))))
+                           (when res
+                             (throw 'found res))))
+                       nil))
+                    ((listp val)
+                     (yaml-pro--search-location val point (cons key path)))
+                    (t nil))))
+               tree)))))
+
 (defun yaml-pro--path-at-point ()
   "Return the object path to current point.
 
@@ -209,6 +242,23 @@ NOTE: This is an experimental feature."
          (val (yaml-pro--find-node parse (point))))
     val))
 
+(defun yaml-pro--extract-paths (tree &optional path)
+  (cond
+   ((listp tree)
+    (flatten-tree
+     (seq-map (lambda (key+val)
+                (yaml-pro--extract-paths (cdr key+val)
+                                         (append path (list (car key+val)))))
+              tree)))
+   ((vectorp tree)
+    (flatten-tree
+     (seq-mapn
+      (lambda (n val)
+        (yaml-pro--extract-paths val (append path (list (format "[%d]" n)))))
+      (number-sequence 0 (1- (length tree)))
+      tree)))
+   (t (concat (string-join path " > ") ": " tree))))
+
 (defun yaml-pro-hide-overlay (ov)
   "Put fold-related properties on overlay OV."
   (overlay-put ov 'invisible 'origami)
@@ -220,6 +270,73 @@ NOTE: This is an experimental feature."
   (overlay-put ov 'invisible nil)
   (overlay-put ov 'display nil)
   (overlay-put ov 'face nil))
+
+(defun yaml-pro--get-last-yaml-pos (str)
+  (let ((i (1- (length str)))
+        (pos))
+    (while (or (not pos) (< i 0))
+      (let ((at-pos (get-text-property i 'yaml-position str)))
+        (when at-pos
+          (setq pos at-pos))
+        (cl-decf i)))
+    pos))
+
+(defun yaml-pro-jump ()
+  "Jump to a specified path."
+  (interactive)
+  (let* ((tree (yaml-parse-string-with-pos (buffer-string)))
+         (paths (yaml-pro--extract-paths tree))
+         (selected (completing-read "Jump to: " paths nil t))
+         ;; get original string which has properties intact
+         (original-str (seq-find (lambda (s) (string= s selected)) paths))
+         (pos (yaml-pro--get-last-yaml-pos original-str)))
+    (goto-char (car pos))))
+
+(defun consult--yaml-pro-jump-preview (paths)
+  (let ((invisible)
+        (overlays)
+        (saved-pos (point-marker))
+        (saved-min (point-min-marker))
+        (saved-max (point-max-marker)))
+    (lambda (cand restore)
+      (mapc #'funcall invisible)
+      (mapc #'delete-overlay overlays)
+      (cond
+       (restore
+        (let ((saved-buffer (marker-buffer saved-pos)))
+          (set-buffer saved-buffer)
+          (narrow-to-region saved-min saved-max)
+          (goto-char saved-pos)))
+       (cand
+        (let ((pos (and (not (string-blank-p cand)) (yaml-pro--get-last-yaml-pos cand))))
+          (when pos
+            (widen)
+            (goto-char (car pos))
+            (run-hooks 'consult-after-jump-hook)
+            (setq invisible (consult--invisible-open-temporarily)
+                  overlays
+                  (list (consult--overlay (car pos) (cdr pos)
+                                          'face 'consult-preview-cursor
+                                          'window (selected-window)))))))))))
+
+(defun consult-yaml-pro-jump ()
+  "Jump to a specified path."
+  (interactive)
+  (let* ((tree (yaml-parse-string-with-pos (buffer-string)))
+         (paths (yaml-pro--extract-paths tree))
+         (sorted-paths (seq-sort-by (lambda (path) (car (yaml-pro--get-last-yaml-pos path)))
+                                    #'< paths))
+         (selected (consult--read
+                    paths
+                    :prompt "Jump to: "
+                    :history 'yaml-pro-jump
+                    :require-match t
+                    :sort nil
+                    :state (let ((preview (consult--yaml-pro-jump-preview paths)))
+                             (lambda (str restore)
+                               (funcall preview str restore)))))
+         (original-str (seq-find (lambda (s) (string= s selected)) paths)))
+    (goto-char (car (yaml-pro--get-last-yaml-pos original-str)))))
 
 (defun yaml-pro-fold-at-point ()
   "Fold YAML at point."
@@ -373,39 +490,6 @@ NOTE: This is an experimental feature."
   (yaml-pro-move-subtree-up)
   (yaml-pro-next-subtree))
 
-(defun yaml-pro--search-location (tree point path)
-  "Return path up to POINT of TREE having visited at PATH."
-  (cond
-   ((stringp tree)
-    (let ((pos (get-text-property 0 'yaml-position tree)))
-      (when (<= (car pos) point (cdr pos))
-        path)))
-   (t
-    (seq-find #'identity
-              (seq-map
-               (lambda (tuple)
-                 (let* ((key (car tuple))
-                        (key-pos (and (stringp key) (get-text-property 0 'yaml-position key)))
-                        (val (cdr tuple))
-                        (val-pos (and (stringp val) (get-text-property 0 'yaml-position val))))
-                   (cond
-                    ((and key-pos (<= (car key-pos) point (cdr key-pos)))
-                     path)
-                    ((and val-pos (<= (car val-pos) point (cdr val-pos)))
-                     (cons key path))
-                    ((vectorp val)
-                     (catch 'found
-                       (dotimes (i (length val))
-                         (let* ((elt (aref val i))
-                                (res (yaml-pro--search-location elt point (cons (number-to-string i) (cons key path)))))
-                           (when res
-                             (throw 'found res))))
-                       nil))
-                    ((listp val)
-                     (yaml-pro--search-location val point (cons key path)))
-                    (t nil))))
-               tree)))))
-
 (defconst yaml-pro-mode-map
   (let ((map (make-sparse-keymap)))
     (prog1 map
@@ -424,7 +508,11 @@ NOTE: This is an experimental feature."
       (define-key map (kbd "s-<up>") #'yaml-pro-move-subtree-up)
       (define-key map (kbd "s-<down>") #'yaml-pro-move-subtree-down)
 
-      (define-key map (kbd "C-c '") #'yaml-pro-edit-scalar))))
+      (define-key map (kbd "C-c '") #'yaml-pro-edit-scalar)
+
+      (define-key map (kbd "C-c C-j") (if (featurep 'consult)
+                                          #'consult-yaml-pro-jump
+                                        #'yaml-pro-jump)))))
 
 (defconst yaml-pro-required-yaml-parser-version "0.5.1")
 
