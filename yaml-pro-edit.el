@@ -3,7 +3,7 @@
 ;; Author: Zachary Romero
 ;; Maintainer: Zachary Romero
 ;; Version: 0.1.0
-;; Package-Requires: ((emacs "26.1") (yaml "0.4.0"))
+;; Package-Requires: ((emacs "26.1") (yaml "0.5.1"))
 ;; Homepage: https://github.com/zkry/yaml-pro
 ;; Keywords: tools
 
@@ -335,9 +335,9 @@ If prefix argument P is provided, prompt user for initialization command."
         (delete-overlay yaml-pro-edit-scalar-overlay))
       (let ((ov (make-overlay start end))
             (read-only
-	         (list
-	          (lambda (&rest _)
-	            (user-error "Can't modify an scalar being edited in a \
+             (list
+              (lambda (&rest _)
+                (user-error "Can't modify an scalar being edited in a \
 dedicated buffer")))))
         (overlay-put ov 'modification-hooks read-only)
         (overlay-put ov 'insert-in-front-hooks read-only)
