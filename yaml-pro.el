@@ -3,10 +3,9 @@
 ;; Author: Zachary Romero
 ;; Maintainer: Zachary Romero
 ;; Version: 0.1.0
-;; Package-Requires: ((emacs "25.1") (yaml "0.4.0"))
+;; Package-Requires: ((emacs "26.1") (yaml "0.4.0"))
 ;; Homepage: https://github.com/zkry/yaml-pro
 ;; Keywords: tools
-
 
 ;; This file is not part of GNU Emacs
 
@@ -221,37 +220,32 @@ NOTE: This is an experimental feature."
              (let ((path (yaml-pro--search-location parse (point) '())))
                (nreverse path))))))))
 
-(defun yaml-pro--find-node (parse point)
-  (catch 'done
-   (cond
-    ((listp parse)
-     (dolist (item parse)
-       (let ((res (yaml-pro--find-node (cdr item) point)))
-         (when res
-           (throw 'done res)))))
-    ((stringp parse)
-     (let* ((bounds (get-text-property 0 'yaml-position parse))
-            (start (and bounds (1+ (car bounds))))
-            (end (and bounds (1+ (cdr bounds)))))
-       (if (<= start point end)
-           parse
-         nil))))))
 
-(defun yaml-pro--value-at-point ()
-  (let* ((parse (yaml-parse-string-with-pos (buffer-string)))
-         (val (yaml-pro--find-node parse (point))))
-    val))
+(defun yaml-pro--flatten-tree (tree)
+  "Return a \"flattened\" copy of TREE. Copied from Emacs 27.1."
+  (let (elems)
+    (while (consp tree)
+      (let ((elem (pop tree)))
+        (while (consp elem)
+          (push (cdr elem) tree)
+          (setq elem (car elem)))
+        (if elem (push elem elems))))
+    (if tree (push tree elems))
+    (nreverse elems)))
 
 (defun yaml-pro--extract-paths (tree &optional path)
+  "Given TREE of parse, return all paths of tree to leaf nodes.
+
+PATH is the current path we have already traversed down."
   (cond
    ((listp tree)
-    (flatten-tree
+    (yaml-pro--flatten-tree
      (seq-map (lambda (key+val)
                 (yaml-pro--extract-paths (cdr key+val)
                                          (append path (list (car key+val)))))
               tree)))
    ((vectorp tree)
-    (flatten-tree
+    (yaml-pro--flatten-tree
      (seq-mapn
       (lambda (n val)
         (yaml-pro--extract-paths val (append path (list (format "[%d]" n)))))
@@ -272,6 +266,7 @@ NOTE: This is an experimental feature."
   (overlay-put ov 'face nil))
 
 (defun yaml-pro--get-last-yaml-pos (str)
+  "Return the last-most text-property `yaml-position' of STR."
   (let ((i (1- (length str)))
         (pos))
     (while (or (not pos) (< i 0))
@@ -292,7 +287,8 @@ NOTE: This is an experimental feature."
          (pos (yaml-pro--get-last-yaml-pos original-str)))
     (goto-char (car pos))))
 
-(defun consult--yaml-pro-jump-preview (paths)
+(defun yaml-pro--consult-jump-preview ()
+  "Return a consult function for displaying current selection."
   (let ((invisible)
         (overlays)
         (saved-pos (point-marker))
@@ -319,7 +315,7 @@ NOTE: This is an experimental feature."
                                           'face 'consult-preview-cursor
                                           'window (selected-window)))))))))))
 
-(defun consult-yaml-pro-jump ()
+(defun yaml-pro-consult-jump ()
   "Jump to a specified path."
   (interactive)
   (let* ((tree (yaml-parse-string-with-pos (buffer-string)))
@@ -332,7 +328,7 @@ NOTE: This is an experimental feature."
                     :history 'yaml-pro-jump
                     :require-match t
                     :sort nil
-                    :state (let ((preview (consult--yaml-pro-jump-preview paths)))
+                    :state (let ((preview (yaml-pro--consult-jump-preview)))
                              (lambda (str restore)
                                (funcall preview str restore)))))
          (original-str (seq-find (lambda (s) (string= s selected)) paths)))
@@ -511,7 +507,7 @@ NOTE: This is an experimental feature."
       (define-key map (kbd "C-c '") #'yaml-pro-edit-scalar)
 
       (define-key map (kbd "C-c C-j") (if (featurep 'consult)
-                                          #'consult-yaml-pro-jump
+                                          #'yaml-pro-consult-jump
                                         #'yaml-pro-jump)))))
 
 (defconst yaml-pro-required-yaml-parser-version "0.5.1")

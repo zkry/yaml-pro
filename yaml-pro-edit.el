@@ -1,5 +1,12 @@
 ;;; yaml-pro-edit.el --- Functions for editing functionality -*- lexical-binding: t -*-
 
+;; Author: Zachary Romero
+;; Maintainer: Zachary Romero
+;; Version: 0.1.0
+;; Package-Requires: ((emacs "26.1") (yaml "0.4.0"))
+;; Homepage: https://github.com/zkry/yaml-pro
+;; Keywords: tools
+
 ;; This file is not part of GNU Emacs
 
 ;; This program is free software: you can redistribute it and/or modify
@@ -127,8 +134,7 @@ Used to fetch location properties on completion.")
 (defun yaml-pro-edit--header-line ()
   "Return the string to display in the header line."
   (let* ((base-text (substitute-command-keys "Edit, then exit with \
-`\\[yaml-pro-edit-complete]' or abort with `\\[yaml-pro-edit-quit]'"))
-         )
+`\\[yaml-pro-edit-complete]' or abort with `\\[yaml-pro-edit-quit]'")))
     (if yaml-pro-edit-output-type
         (let* ((type-str
                 (or (yaml-pro-edit--block-output yaml-pro-edit-output-type)
