@@ -186,11 +186,7 @@ resulting in the function being ran upon subsequent edits."
       (setq-local yaml-pro-edit-output-type nil)
       (when type (setq-local yaml-pro-edit-output-type type))
       (setq header-line-format (yaml-pro-edit--header-line))
-      (insert initial-text)
-      (when (memq type '(folded-strip literal-strip))
-        (save-excursion
-          (goto-char (point-max))
-          (delete-char -1))))))
+      (insert initial-text))))
 
 (defun yaml-pro-edit--extract-scalar-text (scalar-block-string yaml-indent)
   "Strip SCALAR-BLOCK-STRING of all extra indentation with a basis of YAML-INDENT."
@@ -247,6 +243,11 @@ resulting in the function being ran upon subsequent edits."
     (user-error "not in yaml-pro edit buffer"))
   (unless yaml-pro-edit-parent-buffer
     (error "Buffer not connected with yaml buffer"))
+  ;; first ensure that buffer ends with at least one newline
+  (save-excursion
+    (goto-char (point-max))
+    (unless (looking-back "\n")
+      (insert "\n")))
   (let ((edit-buf (current-buffer))
         (edit-str (buffer-substring-no-properties (point-min) (point-max)))
         (type yaml-pro-edit-output-type))

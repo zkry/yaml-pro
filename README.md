@@ -47,6 +47,8 @@ have the following commands available (with default keybindings).
       very common but greatly hinders the effectiveness of tools like
       LSP.  Is there something that could be done (even if it's kind
       of hacky) to alleviate this?
+- [ ] Move functionality to tree-sitter (for better error handling),
+      perhaps when tree-sitter in Emacs reaches some critical mass.
 
 # Contributing
 

@@ -27,10 +27,14 @@
 
 ;; yaml-pro contains a new mode which provides conveniences when
 ;; editing YAML.  Running `yaml-pro-mode' switches the mode and the
-;; following commands are available: `yaml-pro-move-subtree-up',
-;; `yaml-pro-next-subtree', `yaml-pro-prev-subtree',
-;; `yaml-pro-kill-subtree', `yaml-pro-up-level',
-;; `yaml-pro-unfold-at-point', and `yaml-pro-fold-at-point'.
+;; following commands are available:
+;; - `yaml-pro-move-subtree-up' and `yaml-pro-move-subtree-down'
+;; - `yaml-pro-next-subtree' and `yaml-pro-prev-subtree',
+;; - `yaml-pro-kill-subtree'
+;; - `yaml-pro-up-level'
+;; - `yaml-pro-fold-at-point' and `yaml-pro-unfold-at-point'.
+;; - `yaml-pro-edit-scalar'
+;; - `yaml-pro-jump' or if consult exists `yaml-pro-consult-jump'
 
 ;;; Code:
 
@@ -61,6 +65,27 @@
   "Delete cached tree on buffer change."
   (setq yaml-pro-buffer-tree nil))
 
+(defun yaml-pro--find-node (parse point)
+  (catch 'done
+   (cond
+    ((listp parse)
+     (dolist (item parse)
+       (let ((res (yaml-pro--find-node (cdr item) point)))
+         (when res
+           (throw 'done res)))))
+    ((stringp parse)
+     (let* ((bounds (get-text-property 0 'yaml-position parse))
+            (start (and bounds (car bounds)))
+            (end (and bounds (cdr bounds))))
+       (if (and start end (<= start point end))
+           parse
+         nil))))))
+
+(defun yaml-pro--value-at-point ()
+  (let* ((parse (yaml-parse-string-with-pos (buffer-string)))
+         (val (yaml-pro--find-node parse (point))))
+    val))
+
 (defun yaml-pro--get-parent-block* (tree point)
   "Return subtree from TREE that best contain POINT."
   (if (not (listp tree))
@@ -74,19 +99,19 @@
        ((and sub-blocks
              (stringp (car tree))
              (let* ((bounds (get-text-property 0 'yaml-position (cadr tree)))
-                    (start (1+ (car bounds)))
-                    (end (1+ (cdr bounds))))
+                    (start (car bounds))
+                    (end (cdr bounds)))
                (and (numberp start) (<= start point end))))
         (let* ((bounds (get-text-property 0 'yaml-position (cadr tree)))
-               (start (1+ (car bounds)))
-               (end (1+ (cdr bounds))))
+               (start (car bounds))
+               (end (cdr bounds)))
           (throw 'result (list start end))))
        (sub-blocks
         (car sub-blocks))
        ((stringp (car tree))
         (let* ((bounds (get-text-property 0 'yaml-position (cadr tree)))
-               (start (and bounds (1+ (car bounds))))
-               (end (and bounds (1+ (cdr bounds)))))
+               (start (and bounds (car bounds)))
+               (end (and bounds (cdr bounds))))
           (if (and (numberp start) (<= start point end))
               (list start end)
             nil)))
@@ -111,8 +136,8 @@
         (car sub-blocks))
        ((and (stringp (car tree)) (not (equal (car tree) "")))
         (let* ((bounds (get-text-property 0 'yaml-position (cadr tree)))
-               (start (and bounds (1+ (car bounds))))
-               (end (and bounds (1+ (cdr bounds)))))
+               (start (and bounds (car bounds)))
+               (end (and bounds (cdr bounds))))
           (if (and
                (numberp start)
                (<= start point end)
@@ -138,8 +163,8 @@
         (car sub-blocks))
        ((stringp (car tree))
         (let* ((bounds (get-text-property 0 'yaml-position (cadr tree)))
-               (start (and bounds (1+ (car bounds))))
-               (end (and bounds (1+ (cdr bounds)))))
+               (start (and bounds (car bounds)))
+               (end (and bounds (cdr bounds))))
           (if (and (numberp start)
                    (<= start point end)
                    ;; hack to get small maps to not get selected
