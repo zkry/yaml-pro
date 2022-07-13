@@ -515,7 +515,7 @@ PATH is the current path we have already traversed down."
                              (buffer-substring (car prev-bounds)
                                                (cadr prev-bounds)))))
     (when (not prev-bounds)
-      (error "Can't move subtree up"))
+      (error "Can't move subtree"))
     (goto-char (car at-bounds))
     (delete-region (car at-bounds) (cadr at-bounds))
     (insert prev-contents)
