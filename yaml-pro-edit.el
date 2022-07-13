@@ -150,7 +150,8 @@ Used to fetch location properties on completion.")
               (substitute-command-keys
                ". Change output with `\\[yaml-pro-edit-change-output]'")))))
 
-(defun yaml-pro-edit-initialize-buffer (parent-buffer buffer initial-text type initialize path)
+(defun yaml-pro-edit-initialize-buffer
+    (parent-buffer buffer initial-text type initialize path)
   "Initialize the YAML edit buffer.
 
 PARENT-BUFFER is the buffer from which the YAML was copied.
@@ -195,16 +196,18 @@ resulting in the function being ran upon subsequent edits."
   "Strip SCALAR-BLOCK-STRING of all extra indentation with a basis of YAML-INDENT."
   ;; TODO: consider consolidating this logic with that of yaml.el
   (save-match-data
-    (let ((indent-ct-num (progn (string-match "\\`[^\n]*\\([0-9]+\\) *\n" scalar-block-string)
-                                (let ((num-str (match-string 1 scalar-block-string)))
-                                  (and num-str (+ (string-to-number num-str)
-                                                  yaml-indent))))))
+    (let ((indent-ct-num
+           (progn (string-match "\\`[^\n]*\\([0-9]+\\) *\n" scalar-block-string)
+                  (let ((num-str (match-string 1 scalar-block-string)))
+                    (and num-str (+ (string-to-number num-str)
+                                    yaml-indent))))))
       (setq scalar-block-string (string-trim-left scalar-block-string ".*\n"))
       (with-temp-buffer
         (insert scalar-block-string)
         (goto-char (point-min))
-        (let* ((indentation (or indent-ct-num
-                                (yaml-pro-edit--infer-scalar-indent scalar-block-string)))
+        (let* ((indentation
+                (or indent-ct-num
+                    (yaml-pro-edit--infer-scalar-indent scalar-block-string)))
                (indentation-regexp
                 (regexp-quote (make-string indentation ?\s))))
           (while (not (eobp))
@@ -254,7 +257,8 @@ resulting in the function being ran upon subsequent edits."
                (end (cdr pos))
                (indent (yaml-pro-edit--infer-indent start))
                (scalar-indent (yaml-pro-edit--infer-scalar-indent edit-str))
-               (indented-edit-str (yaml-pro-edit-apply-indentation edit-str (+ indent 2) type))
+               (indented-edit-str
+                (yaml-pro-edit-apply-indentation edit-str (+ indent 2) type))
                (block-header (or (yaml-pro-edit--block-output type)
                                  (and (not type)
                                       (> (length (string-lines edit-str)) 1)
@@ -305,12 +309,18 @@ If prefix argument P is provided, prompt user for initialization command."
            (scalar-text (buffer-substring start end))
            (raw-scalar (yaml-pro-edit--extract-scalar-text
                         scalar-text yaml-indent))
-           (folded-block-p (string-match-p "\\` *>\\(?:+\\|-\\)?[0-9]*\n" scalar-text))
-           (literal-block-p (string-match-p "\\` *|\\(?:+\\|-\\)?[0-9]*\n" scalar-text))
-           (strip-p (string-match-p "\\` *.-[0-9]*\n" scalar-text))
-           (keep-p (string-match-p "\\` *.\\+[0-9]*\n" scalar-text))
-           (double-quote-string-p (string-match-p "\\`\".*\"\\'" scalar-text))
-           (single-quote-string-p (string-match-p "\\`'\\(.\\|\n\\)*'\\'" scalar-text))
+           (folded-block-p
+            (string-match-p "\\` *>\\(?:+\\|-\\)?[0-9]*\n" scalar-text))
+           (literal-block-p
+            (string-match-p "\\` *|\\(?:+\\|-\\)?[0-9]*\n" scalar-text))
+           (strip-p
+            (string-match-p "\\` *.-[0-9]*\n" scalar-text))
+           (keep-p
+            (string-match-p "\\` *.\\+[0-9]*\n" scalar-text))
+           (double-quote-string-p
+            (string-match-p "\\`\".*\"\\'" scalar-text))
+           (single-quote-string-p
+            (string-match-p "\\`'\\(.\\|\n\\)*'\\'" scalar-text))
            (type (cond ((and folded-block-p strip-p) 'folded-strip)
                        ((and literal-block-p strip-p) 'literal-strip)
                        ((and folded-block-p keep-p) 'folded-keep)
@@ -326,7 +336,8 @@ If prefix argument P is provided, prompt user for initialization command."
             (read-only
 	         (list
 	          (lambda (&rest _)
-	            (user-error "Can't modify an scalar being edited in a dedicated buffer")))))
+	            (user-error "Can't modify an scalar being edited in a \
+dedicated buffer")))))
         (overlay-put ov 'modification-hooks read-only)
         (overlay-put ov 'insert-in-front-hooks read-only)
         (overlay-put ov 'insert-behind-hooks read-only)
@@ -335,9 +346,11 @@ If prefix argument P is provided, prompt user for initialization command."
       (let ((b (get-buffer-create yaml-pro-edit-buffer-name)))
         (if (or folded-block-p literal-block-p)
             ;; we need to pass the text in buffer if type is block
-            (yaml-pro-edit-initialize-buffer parent-buffer b raw-scalar type init-func path)
+            (yaml-pro-edit-initialize-buffer
+             parent-buffer b raw-scalar type init-func path)
           ;; otherwise use its scalar value (to not show quotes)
-          (yaml-pro-edit-initialize-buffer parent-buffer b at-scalar type init-func path))
+          (yaml-pro-edit-initialize-buffer
+           parent-buffer b at-scalar type init-func path))
         (switch-to-buffer-other-window b)))))
 
 (provide 'yaml-pro-edit)

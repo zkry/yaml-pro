@@ -65,9 +65,11 @@
   "Return subtree from TREE that best contain POINT."
   (if (not (listp tree))
       nil
-    (let ((sub-blocks (seq-filter #'identity
-                                  (seq-map (lambda (st) (yaml-pro--get-parent-block* st point))
-                                           tree))))
+    (let ((sub-blocks
+           (seq-filter #'identity
+                       (seq-map (lambda (st)
+                                  (yaml-pro--get-parent-block* st point))
+                                tree))))
       (cond
        ((and sub-blocks
              (stringp (car tree))
@@ -99,9 +101,10 @@
   "Return subtree from TREE that best contain POINT."
   (if (not (listp tree))
       nil
-    (let ((sub-blocks (seq-filter #'identity
-                                  (seq-map (lambda (st) (yaml-pro-get-block-bounds st point))
-                                           tree))))
+    (let ((sub-blocks
+           (seq-filter #'identity
+                       (seq-map (lambda (st) (yaml-pro-get-block-bounds st point))
+                                tree))))
       (cond
        (sub-blocks
         ;; TODO should find best match instead of firt (?)
@@ -113,8 +116,10 @@
           (if (and
                (numberp start)
                (<= start point end)
-               (not (= (save-excursion (goto-char start) (beginning-of-line) (point))
-                       (save-excursion (goto-char end) (beginning-of-line) (point)))))
+               (not (= (save-excursion
+                         (goto-char start) (beginning-of-line) (point))
+                       (save-excursion
+                         (goto-char end) (beginning-of-line) (point)))))
               (list start end)
             nil)))
        (t nil)))))
@@ -123,9 +128,10 @@
   "Return subtree from TREE that best contain POINT."
   (if (not (listp tree))
       nil
-    (let ((sub-blocks (seq-filter #'identity
-                                  (seq-map (lambda (st) (yaml-pro-get-block st point))
-                                           tree))))
+    (let ((sub-blocks
+           (seq-filter #'identity
+                       (seq-map (lambda (st) (yaml-pro-get-block st point))
+                                tree))))
       (cond
        (sub-blocks
         ;; TODO should find best match instead of firt (?)
@@ -179,9 +185,11 @@
               (seq-map
                (lambda (tuple)
                  (let* ((key (car tuple))
-                        (key-pos (and (stringp key) (get-text-property 0 'yaml-position key)))
+                        (key-pos (and (stringp key)
+                                      (get-text-property 0 'yaml-position key)))
                         (val (cdr tuple))
-                        (val-pos (and (stringp val) (get-text-property 0 'yaml-position val))))
+                        (val-pos (and (stringp val)
+                                      (get-text-property 0 'yaml-position val))))
                    (cond
                     ((and key-pos (<= (car key-pos) point (cdr key-pos)))
                      path)
@@ -191,7 +199,11 @@
                      (catch 'found
                        (dotimes (i (length val))
                          (let* ((elt (aref val i))
-                                (res (yaml-pro--search-location elt point (cons (number-to-string i) (cons key path)))))
+                                (res (yaml-pro--search-location
+                                      elt
+                                      point
+                                      (cons (number-to-string i)
+                                            (cons key path)))))
                            (when res
                              (throw 'found res))))
                        nil))
@@ -304,7 +316,8 @@ PATH is the current path we have already traversed down."
           (narrow-to-region saved-min saved-max)
           (goto-char saved-pos)))
        (cand
-        (let ((pos (and (not (string-blank-p cand)) (yaml-pro--get-last-yaml-pos cand))))
+        (let ((pos (and (not (string-blank-p cand))
+                        (yaml-pro--get-last-yaml-pos cand))))
           (when pos
             (widen)
             (goto-char (car pos))
@@ -320,7 +333,8 @@ PATH is the current path we have already traversed down."
   (interactive)
   (let* ((tree (yaml-parse-string-with-pos (buffer-string)))
          (paths (yaml-pro--extract-paths tree))
-         (sorted-paths (seq-sort-by (lambda (path) (car (yaml-pro--get-last-yaml-pos path)))
+         (sorted-paths (seq-sort-by (lambda (path)
+                                      (car (yaml-pro--get-last-yaml-pos path)))
                                     #'< paths))
          (selected (consult--read
                     paths
@@ -340,7 +354,8 @@ PATH is the current path we have already traversed down."
   (save-excursion
     (skip-syntax-forward " " (line-end-position))
     (let ((parse-tree (yaml-pro--get-buffer-tree)))
-      (let* ((bounds (yaml-pro--fix-bounds (yaml-pro-get-block parse-tree (point))))
+      (let* ((bounds (yaml-pro--fix-bounds
+                      (yaml-pro-get-block parse-tree (point))))
              (beg (car bounds))
              (end (cadr bounds)))
         (when bounds
@@ -354,8 +369,9 @@ PATH is the current path we have already traversed down."
             (overlay-put ov 'invisible 'yaml-pro)
             (overlay-put ov 'isearch-open-invisible 'yaml-pro-isearch-show)
             (overlay-put ov 'isearch-open-invisible-temporary
-                         (lambda (ov hide-p) (if hide-p (yaml-pro-hide-overlay ov)
-                                               (yaml-pro-show-overlay ov))))
+                         (lambda (ov hide-p)
+                           (if hide-p (yaml-pro-hide-overlay ov)
+                             (yaml-pro-show-overlay ov))))
             (overlay-put ov 'display "...")
             (overlay-put ov 'face 'yaml-pro-fold-replacement-face)))))))
 
@@ -365,7 +381,8 @@ PATH is the current path we have already traversed down."
   (save-excursion
     (cond
      ((looking-at ".*:")
-      (let ((ovs (overlays-in (point) (save-excursion (end-of-line) (1+ (point))))))
+      (let ((ovs (overlays-in (point)
+                              (save-excursion (end-of-line) (1+ (point))))))
         (dolist (ov ovs)
           (when (eql (overlay-get ov 'creator) 'yaml-pro)
             (delete-overlay ov)))))
@@ -467,8 +484,11 @@ PATH is the current path we have already traversed down."
          (at-contents (buffer-substring (car at-bounds) (cadr at-bounds)))
          (prev-bounds (save-excursion
                         (let ((ok (yaml-pro-prev-subtree)))
-                          (and ok (yaml-pro-get-block-bounds parse-tree (point))))))
-         (prev-contents (and prev-bounds (buffer-substring (car prev-bounds) (cadr prev-bounds)))))
+                          (and ok (yaml-pro-get-block-bounds parse-tree
+                                                             (point))))))
+         (prev-contents (and prev-bounds
+                             (buffer-substring (car prev-bounds)
+                                               (cadr prev-bounds)))))
     (when (not prev-bounds)
       (error "Can't move subtree up"))
     (goto-char (car at-bounds))
@@ -523,8 +543,11 @@ PATH is the current path we have already traversed down."
   (if yaml-pro-mode
       (progn
         (when (or (not yaml-parser-version)
-                  (version< yaml-parser-version yaml-pro-required-yaml-parser-version))
-          (error "Unsupported yaml.el version.  Ensure that yaml.el package installed and at version %s" yaml-pro-required-yaml-parser-version))
+                  (version< yaml-parser-version
+                            yaml-pro-required-yaml-parser-version))
+          (error "Unsupported yaml.el version.  \
+Ensure that yaml.el package installed and at version %s"
+                 yaml-pro-required-yaml-parser-version))
         (when (equal mode-name "YAML")
           (add-hook 'after-change-functions #'yaml-pro--after-change-hook nil t)))
     (remove-hook 'after-change-functions #'yaml-pro--after-change-hook t)))
