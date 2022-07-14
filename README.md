@@ -1,16 +1,36 @@
 # yaml-pro: tools for editing YAML leveraging a parser
 
-<div style="display:flex">
-<img src="./docs/screenshot1.gif"/>
-<div style="width:10px"></div>
-<img src="./docs/yaml-pro-jump.gif"/>
-</div>
-
 yaml-pro is a package that provides conveniences for editing yaml.  It
 utilizes the YAML parser at https://github.com/zkry/yaml.el to obtain
 a parse tree and is then able to do things like move between subtrees,
 delete entire sections of YAML (even if it's written in JSON style),
 and swap subtrees.
+
+# Demo
+
+### Editing text in detached buffer
+
+![screenshot](./docs/screenshot1.gif)
+
+Never have to consult https://yaml-multiline.info/ again!  With
+`yaml-pro-edit-scalar`, you can edit a scalar value in a detached
+buffer and convert between the various styles with ease.
+
+### Jump to heading (with consult support)
+
+![jumping feature](./docs/yaml-pro-jump.gif)
+
+### Moving subtrees up and down
+
+![jumping feature](./docs/move-subtree.gif)
+
+### Folding subtrees
+
+![jumping feature](./docs/folding.gif)
+
+### Killing subtrees
+
+![jumping feature](./docs/killing-subtree.gif)
 
 # Installation
 
