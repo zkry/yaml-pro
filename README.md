@@ -35,8 +35,11 @@ buffer and convert between the various styles with ease.
 # Installation
 
 This package is not yet on MELPA so you will have to install it
-locally.  **Make sure that you have YAML on the latest version** and
-add yaml-pro.el to your load path.
+locally.  **Make sure that you have the yaml.el package on the latest
+version** and add yaml-pro.el to your load path.
+
+You can have yaml-pro-mode setup on yaml-mode loading with the
+configuration: `(add-hook 'yaml-mode-hook #'yaml-pro-mode)`
 
 # Usage
 
