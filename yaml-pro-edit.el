@@ -188,15 +188,15 @@ resulting in the function being ran upon subsequent edits."
       (setq header-line-format (yaml-pro-edit--header-line))
       (insert initial-text))))
 
-(defun yaml-pro-edit--extract-scalar-text (scalar-block-string yaml-indent)
-  "Strip SCALAR-BLOCK-STRING of all extra indentation with a basis of YAML-INDENT."
+(defun yaml-pro-edit--extract-scalar-text (scalar-block-string yaml-indentation)
+  "Strip SCALAR-BLOCK-STRING of indentation with a basis of YAML-INDENTATION."
   ;; TODO: consider consolidating this logic with that of yaml.el
   (save-match-data
     (let ((indent-ct-num
            (progn (string-match "\\`[^\n]*\\([0-9]+\\) *\n" scalar-block-string)
                   (let ((num-str (match-string 1 scalar-block-string)))
                     (and num-str (+ (string-to-number num-str)
-                                    yaml-indent))))))
+                                    yaml-indentation))))))
       (setq scalar-block-string (string-trim-left scalar-block-string ".*\n"))
       (with-temp-buffer
         (insert scalar-block-string)
@@ -326,10 +326,10 @@ If prefix argument P is provided, prompt user for initialization command."
     (let* ((bounds (get-text-property 0 'yaml-position at-scalar))
            (start (car bounds))
            (end (cdr bounds))
-           (yaml-indent (yaml-pro-edit--infer-indent start))
+           (yaml-indentation (yaml-pro-edit--infer-indent start))
            (scalar-text (buffer-substring start end))
            (raw-scalar (yaml-pro-edit--extract-scalar-text
-                        scalar-text yaml-indent))
+                        scalar-text yaml-indentation))
            (folded-block-p
             (string-match-p "\\` *>\\(?:+\\|-\\)?[0-9]*\n" scalar-text))
            (literal-block-p
