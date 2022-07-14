@@ -66,6 +66,7 @@
   (setq yaml-pro-buffer-tree nil))
 
 (defun yaml-pro--find-node (parse point)
+  "Recursively look through PARSE to find scalar at POINT."
   (catch 'done
    (cond
     ((listp parse)
@@ -82,6 +83,7 @@
          nil))))))
 
 (defun yaml-pro--value-at-point ()
+  "Return the scalar under the current point."
   (let* ((parse (yaml-parse-string-with-pos (buffer-string)))
          (val (yaml-pro--find-node parse (point))))
     val))
