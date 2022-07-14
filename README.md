@@ -62,10 +62,10 @@ have the following commands available (with default keybindings).
 
 *The default bindings are subject to change as this package is in beta*
 
-# Additional packages to explore
+# Recommendations
 
-- Your favorite LSP integration for showing syntax errors, displaying
-  current path, and other LSP features.
+- Yaml-pro's features compliments LSP and will enhance your YAML
+  editing capabilities even further.
 
 # Roadmap
 
