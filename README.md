@@ -54,6 +54,8 @@ have the following commands available (with default keybindings).
 - **yaml-pro-edit-scalar** (<kbd>C-c '</kbd>)
   - (use prefix argument <kbd>C-u</kbd> to supply an initialization
     command to set major mode)
+- **yaml-pro-jump** (or **yaml-pro-consult-jump** if using consult)
+  (<kbd>C-c C-j</kbd>)
 
 *The default bindings are subject to change as this package is in beta*
 
