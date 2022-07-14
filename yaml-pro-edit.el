@@ -264,7 +264,7 @@ resulting in the function being ran upon subsequent edits."
                 (yaml-pro-edit-apply-indentation edit-str (+ indent 2) type))
                (block-header (or (yaml-pro-edit--block-output type)
                                  (and (not type)
-                                      (> (length (string-lines edit-str)) 1)
+                                      (> (length (split-string edit-str "\n")) 1)
                                       ">-")))
                (extract-string (buffer-substring-no-properties start end))
                (end-newline-p (= (aref extract-string
@@ -280,13 +280,13 @@ resulting in the function being ran upon subsequent edits."
                  (insert indented-edit-str))
                 ((or (eql type 'double)
                      (and (not type)
-                          (and (= (length (string-lines edit-str)) 1)
+                          (and (= (length (split-string edit-str "\n")) 1)
                                (string-prefix-p  " " edit-str))))
-                 (insert "\"" (string-replace "\"" "\\\""
-                                              (string-replace "\n" "\\n" edit-str))
+                 (insert "\"" (replace-regexp-in-string  "\"" "\\\\\""
+                                              (replace-regexp-in-string "\n" "\\\\n" edit-str))
                          "\""))
                 ((eql type 'single)
-                 (insert "'" (string-trim-right (string-replace
+                 (insert "'" (string-trim-right (replace-regexp-in-string
                                                  "'" "''"
                                                  indented-edit-str))
                          "'"))
