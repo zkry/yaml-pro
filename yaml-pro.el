@@ -39,8 +39,8 @@
 ;;; Code:
 
 (require 'yaml)
-
 (require 'yaml-pro-edit)
+(require 'consult nil t)
 
 (defgroup yaml-pro nil
   "YAML editing tools."
@@ -292,9 +292,9 @@ PATH is the current path we have already traversed down."
 
 (defun yaml-pro-hide-overlay (ov)
   "Put fold-related properties on overlay OV."
-  (overlay-put ov 'invisible 'origami)
-  (overlay-put ov 'display origami-fold-replacement)
-  (overlay-put ov'face 'yaml-pro-fold-replacement-face))
+  (overlay-put ov 'invisible 'yaml-pro)
+  (overlay-put ov 'display "...")
+  (overlay-put ov 'face 'yaml-pro-fold-replacement-face))
 
 (defun yaml-pro-show-overlay (ov)
   "Remove fold-related properties of overlay OV."
@@ -362,7 +362,7 @@ PATH is the current path we have already traversed down."
                                       (car (yaml-pro--get-last-yaml-pos path)))
                                     #'< paths))
          (selected (consult--read
-                    paths
+                    sorted-paths
                     :prompt "Jump to: "
                     :history 'yaml-pro-jump
                     :require-match t
@@ -534,8 +534,6 @@ PATH is the current path we have already traversed down."
 (defconst yaml-pro-mode-map
   (let ((map (make-sparse-keymap)))
     (prog1 map
-      ;;(suppress-keymap map)
-      (set-keymap-parent map yaml-mode-map)
       (define-key map (kbd "C-c C-x C-w") #'yaml-pro-kill-subtree)
 
       (define-key map (kbd "C-c C-u") #'yaml-pro-up-level)

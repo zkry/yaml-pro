@@ -244,13 +244,15 @@ resulting in the function being ran upon subsequent edits."
   (unless yaml-pro-edit-parent-buffer
     (error "Buffer not connected with yaml buffer"))
   ;; first ensure that buffer ends with at least one newline
-  (save-excursion
-    (goto-char (point-max))
-    (unless (looking-back "\n")
-      (insert "\n")))
-  (let ((edit-buf (current-buffer))
-        (edit-str (buffer-substring-no-properties (point-min) (point-max)))
-        (type yaml-pro-edit-output-type))
+  (let* ((edit-buf (current-buffer))
+         (edit-str (buffer-substring-no-properties (point-min) (point-max)))
+         (type yaml-pro-edit-output-type))
+    (when (not (memq type '(single double)))
+      (save-excursion
+        (goto-char (point-max))
+        (unless (looking-back "\n" (- (point) 2))
+          (insert "\n")
+          (setq edit-str (buffer-substring-no-properties (point-min) (point-max))))))
     (save-excursion
       (with-current-buffer yaml-pro-edit-parent-buffer
         (let* ((pos (get-text-property 0 'yaml-position yaml-pro-edit-scalar))
@@ -263,7 +265,11 @@ resulting in the function being ran upon subsequent edits."
                (block-header (or (yaml-pro-edit--block-output type)
                                  (and (not type)
                                       (> (length (string-lines edit-str)) 1)
-                                      ">-"))))
+                                      ">-")))
+               (extract-string (buffer-substring-no-properties start end))
+               (end-newline-p (= (aref extract-string
+                                       (1- (length extract-string)))
+                                 ?\n)))
           (yaml-pro-edit-cleanup-parent)
           (delete-region start end)
           (goto-char start)
@@ -280,9 +286,23 @@ resulting in the function being ran upon subsequent edits."
                                               (string-replace "\n" "\\n" edit-str))
                          "\""))
                 ((eql type 'single)
-                 (insert "'" (string-replace "'" "''" indented-edit-str) "'"))
+                 (insert "'" (string-trim-right (string-replace
+                                                 "'" "''"
+                                                 indented-edit-str))
+                         "'"))
                 (t
-                 (insert edit-str))))))
+                 (insert edit-str)))
+          ;; following blocks are tricky
+          ;; if the text being extracted is a block, then it ends in a newline
+          ;;   meaning the resulting code should return a newline
+          ;; if the text being extracted is quoted, we need to make sure that
+          ;;   the block doesn't add too many lines than needed.
+          (when (and (not (memq type '(double single)))
+                     (not end-newline-p))
+            (delete-char 1))
+          (when (and (memq type '(double single))
+                     end-newline-p)
+            (insert "\n")))))
     (quit-window)
     (kill-buffer edit-buf)))
 

@@ -1,8 +1,10 @@
 # yaml-pro: tools for editing YAML leveraging a parser
 
-![screenshot](./docs/screenshot1.gif)
-
-![jumping feature](./docs/yaml-pro-jump.gif)
+<div style="display:flex">
+<img src="./docs/screenshot1.gif"/>
+<div style="width:10px"></div>
+<img src="./docs/yaml-pro-jump.gif"/>
+</div>
 
 yaml-pro is a package that provides conveniences for editing yaml.  It
 utilizes the YAML parser at https://github.com/zkry/yaml.el to obtain
@@ -35,6 +37,11 @@ have the following commands available (with default keybindings).
 
 *The default bindings are subject to change as this package is in beta*
 
+# Additional packages to explore
+
+- Your favorite LSP integration for showing syntax errors, displaying
+  current path, and other LSP features.
+
 # Roadmap
 
 - [x] Edit yaml values in separate buffer (like org-edit-special)
@@ -47,6 +54,7 @@ have the following commands available (with default keybindings).
       very common but greatly hinders the effectiveness of tools like
       LSP.  Is there something that could be done (even if it's kind
       of hacky) to alleviate this?
+- [ ] Implement internally path-at-point. (?)
 - [ ] Move functionality to tree-sitter (for better error handling),
       perhaps when tree-sitter in Emacs reaches some critical mass.
 
