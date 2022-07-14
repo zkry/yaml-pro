@@ -324,6 +324,10 @@ PATH is the current path we have already traversed down."
          (pos (yaml-pro--get-last-yaml-pos original-str)))
     (goto-char (car pos))))
 
+(declare-function consult--read "consult")
+(declare-function consult--overlay "consult")
+(declare-function consult--invisible-open-temporarily "consult")
+
 (defun yaml-pro--consult-jump-preview ()
   "Return a consult function for displaying current selection."
   (let ((invisible)
