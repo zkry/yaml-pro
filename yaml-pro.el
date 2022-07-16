@@ -259,7 +259,6 @@ NOTE: This is an experimental feature."
              (let ((path (yaml-pro--search-location parse (point) '())))
                (nreverse path))))))))
 
-
 (defun yaml-pro--flatten-tree (tree)
   "Return a \"flattened\" copy of TREE. Copied from Emacs 27.1."
   (let (elems)
