@@ -34,7 +34,14 @@ buffer and convert between the various styles with ease.
 
 # Installation
 
-You can install this package with MELPA under the id `yaml-pro`.
+You can install this package with MELPA under the id
+`yaml-pro`. **IMPORTANT**: You have to have the latest version of
+yaml.el installed or else this package won't work properly.  If your
+noticing any errors try making sure that you have the correct version
+of yaml.el installed (https://melpa.org/#/yaml).  You can see the
+parser version with the variable `yaml-parser-version` and the
+required version with the variable
+`yaml-pro-required-yaml-parser-version`.
 
 You can have yaml-pro-mode setup on yaml-mode loading with the
 configuration: `(add-hook 'yaml-mode-hook #'yaml-pro-mode)`
