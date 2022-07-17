@@ -82,6 +82,8 @@ have the following commands available (with default keybindings).
 - [ ] Implement internally path-at-point. (?)
 - [ ] Move functionality to tree-sitter (for better error handling),
       perhaps when tree-sitter in Emacs reaches some critical mass.
+- [ ] Common YAML mistakes linter
+- [ ] Difficult-to-handle syntax highlighting
 
 # Contributing
 
