@@ -84,7 +84,7 @@ Used to fetch location properties on completion.")
   (let ((pos (or pos (point))))
     (goto-char pos)
     (forward-line 0)
-    (skip-chars-forward " \n")
+    (skip-chars-forward "- \n")
     (current-column)))
 
 (defconst yaml-pro-edit-output-types
