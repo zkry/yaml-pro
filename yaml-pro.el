@@ -69,6 +69,14 @@
   "Recursively look through PARSE to find scalar at POINT."
   (catch 'done
    (cond
+    ((vectorp parse)
+     (seq-do
+      (lambda (item)
+        (let ((res (yaml-pro--find-node item point)))
+          (when res
+            (throw 'done res))))
+      parse)
+     nil)
     ((listp parse)
      (dolist (item parse)
        (let ((res (yaml-pro--find-node (cdr item) point)))
