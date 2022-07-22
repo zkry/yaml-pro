@@ -2,7 +2,7 @@
 
 ;; Author: Zachary Romero
 ;; Maintainer: Zachary Romero
-;; Version: 0.1.0
+;; Version: 0.1.1
 ;; Package-Requires: ((emacs "26.1") (yaml "0.5.1"))
 ;; Homepage: https://github.com/zkry/yaml-pro
 ;; Keywords: tools
