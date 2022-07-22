@@ -83,6 +83,37 @@ Note that this isn't fully compatable with every command."
   "Return non nil if buffer size is larger than `yaml-pro-max-parse-size'."
   (>= (buffer-size) yaml-pro-max-parse-size))
 
+(defun yaml-pro--fast-parse-bounds (&optional point)
+  "Return a list of the start and end point of subsection to parse.
+
+Find subsection based off of POINT if provided."
+  (let* ((point-indent
+          (save-excursion
+            (beginning-of-line)
+            (skip-chars-forward " ")
+            (current-column)))
+         (indent-regexp (make-string point-indent ?\s))
+         (start-point)
+         (end-point))
+    (if (= point-indent 0)
+        (setq start-point (point-min)
+              end-point (point-max))
+      (save-excursion
+        (beginning-of-line)
+        (while (not (or (bobp)
+                        (and (looking-at " *[a-zA-Z_0-9-]+:\\s-*$")
+                             (not (looking-at indent-regexp)))))
+          (forward-line -1))
+        (setq start-point (point)))
+      (save-excursion
+        (beginning-of-line)
+        (while (not (or (eobp)
+                        (and (not (looking-at indent-regexp))
+                             (not (looking-at " *$")))))
+          (forward-line 1))
+        (setq end-point (point))))
+    (list start-point end-point)))
+
 (defun yaml-pro--get-buffer-tree ()
   "Return the cached buffer-tree if exists, else regenerate it."
   (or yaml-pro-buffer-tree
@@ -90,31 +121,7 @@ Note that this isn't fully compatable with every command."
           (let ((tree (yaml-parse-tree (buffer-string))))
             (setq yaml-pro-buffer-tree tree)
             tree)
-        (let* ((point-indent
-                (save-excursion
-                  (beginning-of-line)
-                  (skip-chars-forward " ")
-                  (current-column)))
-               (indent-regexp (make-string point-indent ?\s))
-               (start-point)
-               (end-point))
-          (if (= point-indent 0)
-              (setq start-point (point-min)
-                    end-point (point-max))
-            (save-excursion
-              (beginning-of-line)
-              (while (not (or (bobp)
-                              (and (looking-at " *[a-zA-Z_0-9-]+:\\s-*$")
-                                   (not (looking-at indent-regexp)))))
-                (forward-line -1))
-              (setq start-point (point)))
-            (save-excursion
-              (beginning-of-line)
-              (while (not (or (eobp)
-                              (and (not (looking-at indent-regexp))
-                                   (not (looking-at " *$")))))
-                (forward-line 1))
-              (setq end-point (point))))
+        (seq-let (start-point end-point) (yaml-pro--fast-parse-bounds)
           (let* ((subsection-string (buffer-substring start-point end-point))
                  (tree (yaml-parse-tree subsection-string)))
             (yaml-pro--offset-parse-tree tree (1- start-point))
@@ -157,29 +164,8 @@ Note that this isn't fully compatable with every command."
 
 This function uses a heuristic to limit the amount of parsing
 that has to be done."
-  (let* ((point-indent
-          (save-excursion
-            (beginning-of-line)
-            (skip-chars-forward " ")
-            (current-column)))
-         (indent-regexp (make-string point-indent ?\s))
-         (start-point)
-         (end-point))
-    (if (= point-indent 0)
-        (setq start-point (point-min)
-              end-point (point-max))
-      (save-excursion
-        (beginning-of-line)
-        (while (not (or (bobp)
-                        (looking-at " *[a-zA-Z_0-9-]+:\\s-*$")) )
-          (forward-line -1))
-        (setq start-point (point)))
-      (save-excursion
-        (beginning-of-line)
-        (while (not (or (eobp)
-                        (not (looking-at indent-regexp))))
-          (forward-line 1))
-        (setq end-point (point))))
+
+  (seq-let (start-point end-point) (yaml-pro--fast-parse-bounds)
     (let* ((subsection-string (buffer-substring start-point end-point))
            (parse (yaml-parse-string-with-pos subsection-string))
            (val (yaml-pro--find-node parse (1+ (- (point) start-point)))))
@@ -464,6 +450,8 @@ PATH is the current path we have already traversed down."
                   (list (consult--overlay (car pos) (cdr pos)
                                           'face 'consult-preview-cursor
                                           'window (selected-window)))))))))))
+
+;;; Interactive commands
 
 (defun yaml-pro-consult-jump ()
   "Jump to a specified path."
