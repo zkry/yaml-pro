@@ -167,13 +167,13 @@ resulting in the function being ran upon subsequent edits."
     (setq-local yaml-pro-edit-initialization-cache
                 (make-hash-table :test 'equal)))
   (let* ((init-cache yaml-pro-edit-initialization-cache)
-         (init-fn (or initialize (gethash path init-cache))))
+         (init-fn (or initialize (and path (gethash path init-cache)))))
     (with-current-buffer buffer
       (when (functionp init-fn)
         (condition-case e
             (progn
               (funcall init-fn)
-              (when initialize
+              (when (and initialize path)
                 (puthash path initialize init-cache)))
           (error (message "Initialization failed with: %S"
                           (error-message-string e)))))
@@ -306,17 +306,21 @@ resulting in the function being ran upon subsequent edits."
     (kill-buffer edit-buf)))
 
 (declare-function yaml-pro--value-at-point "yaml-pro")
+(declare-function yaml-pro--fast-value-at-point "yaml-pro")
 (declare-function yaml-pro--path-at-point "yaml-pro")
+(defvar yaml-pro-max-parse-size)
 
 ;;;###autoload
 (defun yaml-pro-edit-scalar (p)
   "Edit the scalar value at the point in a separate buffer.
 If prefix argument P is provided, prompt user for initialization command."
   (interactive "p")
-  (let ((init-func)
-        (at-scalar (yaml-pro--value-at-point))
-        (path (yaml-pro--path-at-point))
-        (parent-buffer (current-buffer)))
+  (let* ((init-func)
+         (fast-p (> (buffer-size) yaml-pro-max-parse-size))
+         (at-scalar (if fast-p (yaml-pro--fast-value-at-point)
+                      (yaml-pro--value-at-point)))
+         (path (and (not fast-p) (yaml-pro--path-at-point)))
+         (parent-buffer (current-buffer)))
     (unless at-scalar
       (user-error "No value found at point"))
     (when (= 4 p)

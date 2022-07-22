@@ -47,6 +47,14 @@
   :prefix "yaml-pro-"
   :group 'convenience)
 
+(defcustom yaml-pro-max-parse-size 5000
+  "Size of buffer for which any size greater than use heuristic to parse.
+
+Note that this isn't fully compatable with every command."
+  :group 'yaml-pro
+  :type 'number
+  :package-version '(yaml-pro "0.2.0"))
+
 (defface yaml-pro-fold-replacement-face
   '((t :inherit 'font-lock-comment-face))
   "Face for fold replacement text.")
@@ -90,11 +98,44 @@
            parse
          nil))))))
 
+(defun yaml-pro--fast-value-at-point ()
+  "Return the scalar under the current point.
+
+This function uses a heuristic to limit the amount of parsing
+that has to be done."
+  (let* ((point-indent
+          (save-excursion
+            (beginning-of-line)
+            (skip-chars-forward " ")
+            (current-column)))
+         (indent-regexp (make-string point-indent ?\s))
+         (start-point)
+         (end-point))
+    (save-excursion
+      (beginning-of-line)
+      (while (not (or (bobp)
+                      (looking-at " *[a-zA-Z_-]+:\\s-*$")) )
+        (forward-line -1))
+      (setq start-point (point)))
+    (save-excursion
+      (beginning-of-line)
+      (while (not (or (eobp)
+                      (not (looking-at indent-regexp))))
+        (forward-line 1))
+      (setq end-point (point)))
+    (let* ((subsection-string (buffer-substring start-point end-point))
+           (parse (yaml-parse-string-with-pos subsection-string))
+           (val (yaml-pro--find-node parse (1+ (- (point) start-point))))
+           (yaml-position (get-text-property 0 'yaml-position val))
+           (new-position (cons (1- (+ (car yaml-position) start-point))
+                               (1- (+ (cdr yaml-position) start-point)))))
+      (set-text-properties 0 (length val) (list 'yaml-position new-position) val)
+      val)))
+
 (defun yaml-pro--value-at-point ()
   "Return the scalar under the current point."
-  (let* ((parse (yaml-parse-string-with-pos (buffer-string)))
-         (val (yaml-pro--find-node parse (point))))
-    val))
+  (let* ((parse (yaml-parse-string-with-pos (buffer-string))))
+    (yaml-pro--find-node parse (point))))
 
 (defun yaml-pro--get-parent-block* (tree point)
   "Return subtree from TREE that best contain POINT."
