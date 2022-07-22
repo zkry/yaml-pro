@@ -308,7 +308,7 @@ resulting in the function being ran upon subsequent edits."
 (declare-function yaml-pro--value-at-point "yaml-pro")
 (declare-function yaml-pro--fast-value-at-point "yaml-pro")
 (declare-function yaml-pro--path-at-point "yaml-pro")
-(defvar yaml-pro-max-parse-size)
+(declare-function yaml-pro--use-fast-p "yaml-pro")
 
 ;;;###autoload
 (defun yaml-pro-edit-scalar (p)
@@ -316,7 +316,7 @@ resulting in the function being ran upon subsequent edits."
 If prefix argument P is provided, prompt user for initialization command."
   (interactive "p")
   (let* ((init-func)
-         (fast-p (> (buffer-size) yaml-pro-max-parse-size))
+         (fast-p (yaml-pro--use-fast-p))
          (at-scalar (if fast-p (yaml-pro--fast-value-at-point)
                       (yaml-pro--value-at-point)))
          (path (and (not fast-p) (yaml-pro--path-at-point)))
