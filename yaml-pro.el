@@ -2,7 +2,7 @@
 
 ;; Author: Zachary Romero
 ;; Maintainer: Zachary Romero
-;; Version: 0.1.0
+;; Version: 0.1.1
 ;; Package-Requires: ((emacs "26.1") (yaml "0.5.1"))
 ;; Homepage: https://github.com/zkry/yaml-pro
 ;; Keywords: tools
@@ -47,19 +47,88 @@
   :prefix "yaml-pro-"
   :group 'convenience)
 
+(defcustom yaml-pro-max-parse-size 5000
+  "Size of buffer for which any size greater than use heuristic to parse.
+
+Note that this isn't fully compatable with every command."
+  :group 'yaml-pro
+  :type 'number
+  :package-version '(yaml-pro "0.2.0"))
+
 (defface yaml-pro-fold-replacement-face
   '((t :inherit 'font-lock-comment-face))
   "Face for fold replacement text.")
 
 (defvar-local yaml-pro-buffer-tree nil)
 
+(defun yaml-pro--offset-parse-tree (tree offset)
+  "Offset all TREE values of `yaml-position' property by OFFSET."
+  (cond
+   ((or (listp tree) (vectorp tree))
+    (seq-map
+     (lambda (elt)
+       (yaml-pro--offset-parse-tree elt offset))
+     tree))
+   ((stringp tree)
+    (let* ((yaml-position (get-text-property 0 'yaml-position tree)))
+      (when yaml-position
+        (let ((offset-position (cons (+ (car yaml-position) offset)
+                                     (+ (cdr yaml-position) offset))))
+          (set-text-properties 0
+                               (length tree)
+                               (list 'yaml-position offset-position)
+                               tree)))))))
+
+(defun yaml-pro--use-fast-p ()
+  "Return non nil if buffer size is larger than `yaml-pro-max-parse-size'."
+  (>= (buffer-size) yaml-pro-max-parse-size))
+
+(defun yaml-pro--fast-parse-bounds (&optional point)
+  "Return a list of the start and end point of subsection to parse.
+
+Find subsection based off of POINT if provided."
+  (let* ((point-indent
+          (save-excursion
+            (beginning-of-line)
+            (skip-chars-forward " ")
+            (current-column)))
+         (indent-regexp (make-string point-indent ?\s))
+         (start-point)
+         (end-point))
+    (if (= point-indent 0)
+        (setq start-point (point-min)
+              end-point (point-max))
+      (save-excursion
+        (beginning-of-line)
+        (while (not (or (bobp)
+                        (and (looking-at " *[a-zA-Z_0-9-]+:\\s-*$")
+                             (not (looking-at indent-regexp)))))
+          (forward-line -1))
+        (setq start-point (point)))
+      (save-excursion
+        (beginning-of-line)
+        (while (not (or (eobp)
+                        (and (not (looking-at indent-regexp))
+                             (not (looking-at " *$")))))
+          (forward-line 1))
+        (setq end-point (point))))
+    (list start-point end-point)))
+
 (defun yaml-pro--get-buffer-tree ()
   "Return the cached buffer-tree if exists, else regenerate it."
   (or yaml-pro-buffer-tree
-      (let ((tree (yaml-parse-tree (buffer-string))))
-        (progn
-          (setq yaml-pro-buffer-tree tree)
-          tree))))
+      (if (not (yaml-pro--use-fast-p))
+          (let ((tree (yaml-parse-tree (buffer-string))))
+            (setq yaml-pro-buffer-tree tree)
+            tree)
+        (seq-let (start-point end-point) (yaml-pro--fast-parse-bounds)
+          (let* ((subsection-string (buffer-substring start-point end-point))
+                 (tree (yaml-parse-tree subsection-string)))
+            (yaml-pro--offset-parse-tree tree (1- start-point))
+            (when (and (= start-point (point-min))
+                       (= end-point (point-max)))
+              (setq yaml-pro-buffer-tree tree))
+            tree)))))
 
 (defun yaml-pro--after-change-hook (_ _ _)
   "Delete cached tree on buffer change."
@@ -90,11 +159,27 @@
            parse
          nil))))))
 
+(defun yaml-pro--fast-value-at-point ()
+  "Return the scalar under the current point.
+
+This function uses a heuristic to limit the amount of parsing
+that has to be done."
+
+  (seq-let (start-point end-point) (yaml-pro--fast-parse-bounds)
+    (let* ((subsection-string (buffer-substring start-point end-point))
+           (parse (yaml-parse-string-with-pos subsection-string))
+           (val (yaml-pro--find-node parse (1+ (- (point) start-point)))))
+      (when val
+        (let* ((yaml-position (get-text-property 0 'yaml-position val))
+               (new-position (cons (1- (+ (car yaml-position) start-point))
+                                   (1- (+ (cdr yaml-position) start-point)))))
+          (set-text-properties 0 (length val) (list 'yaml-position new-position) val)
+          val)))))
+
 (defun yaml-pro--value-at-point ()
   "Return the scalar under the current point."
-  (let* ((parse (yaml-parse-string-with-pos (buffer-string)))
-         (val (yaml-pro--find-node parse (point))))
-    val))
+  (let* ((parse (yaml-parse-string-with-pos (buffer-string))))
+    (yaml-pro--find-node parse (point))))
 
 (defun yaml-pro--get-parent-block* (tree point)
   "Return subtree from TREE that best contain POINT."
@@ -365,6 +450,8 @@ PATH is the current path we have already traversed down."
                   (list (consult--overlay (car pos) (cdr pos)
                                           'face 'consult-preview-cursor
                                           'window (selected-window)))))))))))
+
+;;; Interactive commands
 
 (defun yaml-pro-consult-jump ()
   "Jump to a specified path."

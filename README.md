@@ -67,6 +67,14 @@ have the following commands available (with default keybindings).
 
 *The default bindings are subject to change as this package is in beta*
 
+# Configuration
+
+Yaml.el, being an Emacs lisp parser, struggles with very large files.
+You can configure the parser to parse a smaller section of the buffer
+via a heuristic (probably error prone).  Set the custom variable
+`yaml-pro-max-parse-size` to be the size of the buffer after which
+such a heuristic is used.
+
 # Recommendations
 
 - Yaml-pro's features compliments LSP and will enhance your YAML
@@ -78,6 +86,7 @@ have the following commands available (with default keybindings).
   - [x] block options for how to store the string.
   - [x] save default init command on a path basis
 - [x] Easy navigation (yaml-pro-jump)
+- [x] Partial tree-parsing for large files
 - [ ] Async parsing: preemptively parse document for faster editing
       (perhaps via idle timer).
 - [ ] Tools to work with various template modes.  Go-templated YAML is
