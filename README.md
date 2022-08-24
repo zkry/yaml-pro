@@ -55,7 +55,7 @@ have the following commands available (with default keybindings).
 - **yaml-pro-up-level** (<kbd>C-c</kbd> <kbd>C-u</kbd>)
 - **yaml-pro-next-subtree** (<kbd>C-c</kbd> <kbd>C-n</kbd>)
 - **yaml-pro-prev-subtree** (<kbd>C-c</kbd> <kbd>C-p</kbd>)
-- **yaml-pro-fold-at-point** (<kbd>C-c</kbd> <kbd>C-c</kbd>)
+- **yaml-pro-fold-at-point** (<kbd>C-c</kbd> <kbd>C-f</kbd>)
 - **yaml-pro-unfold-at-point** (<kbd>C-c</kbd> <kbd>C-o</kbd>)
 - **yaml-pro-move-subtree-up** (<kbd>s-up</kbd>)
 - **yaml-pro-move-subtree-down** (<kbd>s-down</kbd>)
