@@ -737,6 +737,45 @@ Ensure that yaml.el package installed and at version %s"
           (add-hook 'after-change-functions #'yaml-pro--after-change-hook nil t)))
     (remove-hook 'after-change-functions #'yaml-pro--after-change-hook t)))
 
+(defun yaml-pro--go-on-blank-line-p ()
+  "Return non-nil if the template item is on an otherwise blank line."
+  (save-excursion
+    (forward-line 0)
+    (looking-at-p " *{{")))
+
+(defun yaml-pro--go-convert-template ()
+  "Transform a Go templated file to something that is parsable."
+  (goto-char (point-min))
+  (while (search-forward-regexp "{{.?*}}" nil t)
+    (if (yaml-pro--go-on-blank-line-p)
+        (progn
+          (goto-char (match-beginning 0))
+          (insert "#"))
+      (insert "'")
+      (goto-char (match-beginning 0))
+      (insert "'")
+      (goto-char (match-end 0)))))
+
+(defun yaml-pro--go-after-change-hook ()
+  "")
+
+(define-minor-mode yaml-pro-go-template-mode
+  "Add overlays to render Go templates in a YAML file parsable."
+  :init-value nil
+  :group 'yaml-pro
+  :keymap yaml-pro-mode-map
+  (if yaml-pro-mode
+      (progn
+        (when (or (not yaml-parser-version)
+                  (version< yaml-parser-version
+                            yaml-pro-required-yaml-parser-version))
+          (error "Unsupported yaml.el version.  \
+Ensure that yaml.el package installed and at version %s"
+                 yaml-pro-required-yaml-parser-version))
+        (when (equal mode-name "YAML")
+          (add-hook 'after-change-functions #'yaml-pro--go-after-change-hook nil t)))
+    (remove-hook 'after-change-functions #'yaml-pro--after-change-hook t)))
+
 (provide 'yaml-pro)
 
 ;;; yaml-pro.el ends here
