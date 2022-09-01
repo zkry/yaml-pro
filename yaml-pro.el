@@ -665,7 +665,8 @@ PATH is the current path we have already traversed down."
   :keymap yaml-pro-mode-map
   (if yaml-pro-mode
       (progn
-        (when (or (not yaml-parser-version)
+        (when (or (not (boundp 'yaml-parser-version))
+                  (not yaml-parser-version)
                   (version< yaml-parser-version
                             yaml-pro-required-yaml-parser-version))
           (error "Unsupported yaml.el version.  \
