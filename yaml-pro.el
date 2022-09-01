@@ -743,6 +743,16 @@ Ensure that yaml.el package installed and at version %s"
     (forward-line 0)
     (looking-at-p " *{{")))
 
+(defvar yaml-pro-template-overlays nil)
+
+(defun yaml-pro--delete-template-overlays ()
+  (dolist (ov yaml-pro-template-overlays)
+    (let ((start (overlay-start ov))
+          (end (overlay-end ov)))
+      (kill-region start end))
+    (delete-overlay ov))
+  (setq yaml-pro-template-overlays nil))
+
 (defun yaml-pro--go-convert-template ()
   "Transform a Go templated file to something that is parsable."
   (goto-char (point-min))
@@ -750,10 +760,20 @@ Ensure that yaml.el package installed and at version %s"
     (if (yaml-pro--go-on-blank-line-p)
         (progn
           (goto-char (match-beginning 0))
-          (insert "#"))
+          (insert "#")
+          (let ((ov (make-overlay (1- (point)) (point))))
+            (overlay-put ov 'invisible t)
+            (add-to-list 'yaml-pro-template-overlays ov)
+            (goto-char (match-end 0))))
       (insert "'")
+      (let ((ov (make-overlay (1- (point)) (point))))
+        (overlay-put ov 'invisible t)
+        (add-to-list 'yaml-pro-template-overlays ov))
       (goto-char (match-beginning 0))
       (insert "'")
+      (let ((ov (make-overlay (1- (point)) (point))))
+        (overlay-put ov 'invisible t)
+        (add-to-list 'yaml-pro-template-overlays ov))
       (goto-char (match-end 0)))))
 
 (defun yaml-pro--go-after-change-hook ()
@@ -774,7 +794,8 @@ Ensure that yaml.el package installed and at version %s"
                  yaml-pro-required-yaml-parser-version))
         (when (equal mode-name "YAML")
           (add-hook 'after-change-functions #'yaml-pro--go-after-change-hook nil t)))
-    (remove-hook 'after-change-functions #'yaml-pro--after-change-hook t)))
+    (remove-hook 'after-change-functions #'yaml-pro--after-change-hook t)
+    (yaml-pro--delete-template-overlays)))
 
 (provide 'yaml-pro)
 
