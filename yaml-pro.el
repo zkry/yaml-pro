@@ -755,28 +755,38 @@ Ensure that yaml.el package installed and at version %s"
 
 (defun yaml-pro--go-convert-template ()
   "Transform a Go templated file to something that is parsable."
-  (goto-char (point-min))
-  (while (search-forward-regexp "{{.?*}}" nil t)
-    (if (yaml-pro--go-on-blank-line-p)
-        (progn
-          (goto-char (match-beginning 0))
-          (insert "#")
-          (let ((ov (make-overlay (1- (point)) (point))))
-            (overlay-put ov 'invisible t)
-            (add-to-list 'yaml-pro-template-overlays ov)
-            (goto-char (match-end 0))))
-      (insert "'")
-      (let ((ov (make-overlay (1- (point)) (point))))
-        (overlay-put ov 'invisible t)
-        (add-to-list 'yaml-pro-template-overlays ov))
-      (goto-char (match-beginning 0))
-      (insert "'")
-      (let ((ov (make-overlay (1- (point)) (point))))
-        (overlay-put ov 'invisible t)
-        (add-to-list 'yaml-pro-template-overlays ov))
-      (goto-char (match-end 0)))))
+  (save-excursion
+    (goto-char (point-min))
+    (while (search-forward-regexp "{{.?*}}" nil t)
+      (if (yaml-pro--go-on-blank-line-p)
+          (progn
+            (goto-char (match-beginning 0))
+            (insert "#")
+            (let ((ov (make-overlay (1- (point)) (point))))
+              (overlay-put ov 'invisible t)
+              (add-to-list 'yaml-pro-template-overlays ov)
+              (goto-char (match-end 0))))
+        (insert "'")
+        (let ((ov (make-overlay (1- (point)) (point))))
+          (overlay-put ov 'invisible t)
+          (add-to-list 'yaml-pro-template-overlays ov))
+        (goto-char (match-beginning 0))
+        (insert "'")
+        (let ((ov (make-overlay (1- (point)) (point))))
+          (overlay-put ov 'invisible t)
+          (add-to-list 'yaml-pro-template-overlays ov))
+        (goto-char (match-end 0))))))
 
-(defun yaml-pro--go-after-change-hook ()
+(defun yaml-pro--go-before-save-hook ()
+  "Ensrue that before saving, the extra comments/quotes are removed."
+  (yaml-pro--delete-template-overlays))
+
+(defun yaml-pro--go-after-save-hook ()
+  "After save, regenerate comments and quote."
+  (yaml-pro--go-convert-template)
+  (set-buffer-modified-p nil))
+
+(defun yaml-pro--go-after-change-hook (_ _ _)
   "")
 
 (define-minor-mode yaml-pro-go-template-mode
@@ -784,7 +794,7 @@ Ensure that yaml.el package installed and at version %s"
   :init-value nil
   :group 'yaml-pro
   :keymap yaml-pro-mode-map
-  (if yaml-pro-mode
+  (if yaml-pro-go-template-mode
       (progn
         (when (or (not yaml-parser-version)
                   (version< yaml-parser-version
@@ -793,8 +803,13 @@ Ensure that yaml.el package installed and at version %s"
 Ensure that yaml.el package installed and at version %s"
                  yaml-pro-required-yaml-parser-version))
         (when (equal mode-name "YAML")
-          (add-hook 'after-change-functions #'yaml-pro--go-after-change-hook nil t)))
-    (remove-hook 'after-change-functions #'yaml-pro--after-change-hook t)
+          ;;(add-hook 'after-change-functions #'yaml-pro--go-after-change-hook nil t)
+          (add-hook 'before-save-hook #'yaml-pro--go-before-save-hook nil t)
+          (add-hook 'after-save-hook #'yaml-pro--go-after-save-hook nil t)
+          (yaml-pro--delete-template-overlays)))
+    ;;(remove-hook 'after-change-functions #'yaml-pro--after-change-hook t)
+    (remove-hook 'before-save-hook #'yaml-pro--go-before-save-hook t)
+    (remove-hook 'after-save-hook #'yaml-pro--go-after-save-hook t)
     (yaml-pro--delete-template-overlays)))
 
 (provide 'yaml-pro)
