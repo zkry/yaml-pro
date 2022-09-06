@@ -746,11 +746,12 @@ Ensure that yaml.el package installed and at version %s"
 (defvar yaml-pro-template-overlays nil)
 
 (defun yaml-pro--delete-template-overlays ()
-  (dolist (ov yaml-pro-template-overlays)
-    (let ((start (overlay-start ov))
-          (end (overlay-end ov)))
-      (kill-region start end))
-    (delete-overlay ov))
+  (save-excursion
+    (dolist (ov yaml-pro-template-overlays)
+      (let ((start (overlay-start ov))
+            (end (overlay-end ov)))
+        (delete-region start end))
+      (delete-overlay ov)))
   (setq yaml-pro-template-overlays nil))
 
 (defun yaml-pro--go-convert-template ()
@@ -786,6 +787,10 @@ Ensure that yaml.el package installed and at version %s"
   (yaml-pro--go-convert-template)
   (set-buffer-modified-p nil))
 
+(defun yaml-pro--go-post-command-hook ()
+  "After command regenerate comments and quote."
+  (yaml-pro--go-convert-template))
+
 (defun yaml-pro--go-after-change-hook (_ _ _)
   "")
 
@@ -806,10 +811,14 @@ Ensure that yaml.el package installed and at version %s"
           ;;(add-hook 'after-change-functions #'yaml-pro--go-after-change-hook nil t)
           (add-hook 'before-save-hook #'yaml-pro--go-before-save-hook nil t)
           (add-hook 'after-save-hook #'yaml-pro--go-after-save-hook nil t)
+          (add-hook 'pre-command-hook #'yaml-pro--go-before-save-hook nil t)
+          (add-hook 'post-command-hook #'yaml-pro--go-post-command-hook nil t)
           (yaml-pro--delete-template-overlays)))
     ;;(remove-hook 'after-change-functions #'yaml-pro--after-change-hook t)
     (remove-hook 'before-save-hook #'yaml-pro--go-before-save-hook t)
     (remove-hook 'after-save-hook #'yaml-pro--go-after-save-hook t)
+    (remove-hook 'pre-command-hook #'yaml-pro--go-before-save-hook t)
+    (remove-hook 'post-command-hook #'yaml-pro--go-post-command-hook t)
     (yaml-pro--delete-template-overlays)))
 
 (provide 'yaml-pro)
