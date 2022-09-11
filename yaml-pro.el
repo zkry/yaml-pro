@@ -415,13 +415,14 @@ PATH is the current path we have already traversed down."
 (defun yaml-pro-jump ()
   "Jump to a specified path."
   (interactive)
-  (let* ((tree (yaml-parse-string-with-pos (buffer-string)))
-         (paths (yaml-pro--extract-paths tree))
-         (selected (completing-read "Jump to: " paths nil t))
-         ;; get original string which has properties intact
-         (original-str (seq-find (lambda (s) (string= s selected)) paths))
-         (pos (yaml-pro--get-last-yaml-pos original-str)))
-    (goto-char (car pos))))
+  (yaml-pro-with-ensure-overlays
+   (let* ((tree (yaml-parse-string-with-pos (buffer-string)))
+          (paths (yaml-pro--extract-paths tree))
+          (selected (completing-read "Jump to: " paths nil t))
+          ;; get original string which has properties intact
+          (original-str (seq-find (lambda (s) (string= s selected)) paths))
+          (pos (yaml-pro--get-last-yaml-pos original-str)))
+     (goto-char (car pos)))))
 
 (declare-function consult--read "consult")
 (declare-function consult--overlay "consult")
@@ -461,150 +462,157 @@ PATH is the current path we have already traversed down."
 (defun yaml-pro-consult-jump ()
   "Jump to a specified path."
   (interactive)
-  (let* ((tree (yaml-parse-string-with-pos (buffer-string)))
-         (paths (yaml-pro--extract-paths tree))
-         (sorted-paths (seq-sort-by (lambda (path)
-                                      (car (yaml-pro--get-last-yaml-pos path)))
-                                    #'< paths))
-         (selected (consult--read
-                    sorted-paths
-                    :prompt "Jump to: "
-                    :history 'yaml-pro-jump
-                    :require-match t
-                    :sort nil
-                    :state (let ((preview (yaml-pro--consult-jump-preview)))
-                             (lambda (str restore)
-                               (funcall preview str restore)))))
-         (original-str (seq-find (lambda (s) (string= s selected)) paths)))
-    (goto-char (car (yaml-pro--get-last-yaml-pos original-str)))))
+  (yaml-pro-with-ensure-overlays
+   (let* ((tree (yaml-parse-string-with-pos (buffer-string)))
+          (paths (yaml-pro--extract-paths tree))
+          (sorted-paths (seq-sort-by (lambda (path)
+                                       (car (yaml-pro--get-last-yaml-pos path)))
+                                     #'< paths))
+          (selected (consult--read
+                     sorted-paths
+                     :prompt "Jump to: "
+                     :history 'yaml-pro-jump
+                     :require-match t
+                     :sort nil
+                     :state (let ((preview (yaml-pro--consult-jump-preview)))
+                              (lambda (str restore)
+                                (funcall preview str restore)))))
+          (original-str (seq-find (lambda (s) (string= s selected)) paths)))
+     (goto-char (car (yaml-pro--get-last-yaml-pos original-str))))))
 
 (defun yaml-pro-fold-at-point ()
   "Fold YAML at point."
   (interactive)
-  (save-excursion
-    (skip-syntax-forward " " (line-end-position))
-    (let ((parse-tree (yaml-pro--get-buffer-tree)))
-      (let* ((bounds (yaml-pro--fix-bounds
-                      (yaml-pro-get-block parse-tree (point))))
-             (beg (car bounds))
-             (end (cadr bounds)))
-        (when bounds
-          ;; Delete all inner folds before creating outer one
-          (let ((ovs (overlays-in beg end)))
-            (dolist (ov ovs)
-              (when (eql (overlay-get ov 'creator) 'yaml-pro)
-                (delete-overlay ov))))
-          (let ((ov (make-overlay beg end)))
-            (overlay-put ov 'creator 'yaml-pro)
-            (overlay-put ov 'invisible 'yaml-pro)
-            (overlay-put ov 'isearch-open-invisible 'yaml-pro-isearch-show)
-            (overlay-put ov 'isearch-open-invisible-temporary
-                         (lambda (ov hide-p)
-                           (if hide-p (yaml-pro-hide-overlay ov)
-                             (yaml-pro-show-overlay ov))))
-            (overlay-put ov 'display "...")
-            (overlay-put ov 'face 'yaml-pro-fold-replacement-face)))))))
+  (yaml-pro-with-ensure-overlays
+   (save-excursion
+     (skip-syntax-forward " " (line-end-position))
+     (let ((parse-tree (yaml-pro--get-buffer-tree)))
+       (let* ((bounds (yaml-pro--fix-bounds
+                       (yaml-pro-get-block parse-tree (point))))
+              (beg (car bounds))
+              (end (cadr bounds)))
+         (when bounds
+           ;; Delete all inner folds before creating outer one
+           (let ((ovs (overlays-in beg end)))
+             (dolist (ov ovs)
+               (when (eql (overlay-get ov 'creator) 'yaml-pro)
+                 (delete-overlay ov))))
+           (let ((ov (make-overlay beg end)))
+             (overlay-put ov 'creator 'yaml-pro)
+             (overlay-put ov 'invisible 'yaml-pro)
+             (overlay-put ov 'isearch-open-invisible 'yaml-pro-isearch-show)
+             (overlay-put ov 'isearch-open-invisible-temporary
+                          (lambda (ov hide-p)
+                            (if hide-p (yaml-pro-hide-overlay ov)
+                              (yaml-pro-show-overlay ov))))
+             (overlay-put ov 'display "...")
+             (overlay-put ov 'face 'yaml-pro-fold-replacement-face))))))))
 
 (defun yaml-pro-unfold-at-point ()
   "Unfold YAML at point."
   (interactive)
-  (save-excursion
-    (cond
-     ((looking-at ".*:")
-      (let ((ovs (overlays-in (point)
-                              (save-excursion (end-of-line) (1+ (point))))))
-        (dolist (ov ovs)
-          (when (eql (overlay-get ov 'creator) 'yaml-pro)
-            (delete-overlay ov)))))
-     (t
-      (let ((ovs (overlays-at (1+ (point)))))
-        (dolist (ov ovs)
-          (when (eql (overlay-get ov 'creator) 'yaml-pro)
-            (delete-overlay ov))))))))
+  (yaml-pro-with-ensure-overlays
+   (save-excursion
+     (cond
+      ((looking-at ".*:")
+       (let ((ovs (overlays-in (point)
+                               (save-excursion (end-of-line) (1+ (point))))))
+         (dolist (ov ovs)
+           (when (eql (overlay-get ov 'creator) 'yaml-pro)
+             (delete-overlay ov)))))
+      (t
+       (let ((ovs (overlays-at (1+ (point)))))
+         (dolist (ov ovs)
+           (when (eql (overlay-get ov 'creator) 'yaml-pro)
+             (delete-overlay ov)))))))))
 
 (defun yaml-pro-up-level ()
   "Move the point to the parent tree."
   (interactive)
-  (if (and (bolp) (not (looking-at "[ \n\t#]")))
-      (goto-char (point-min))
-    (let* ((start (point))
-           (parse-tree (yaml-pro--get-buffer-tree))
-           (bounds (yaml-pro-get-block-bounds parse-tree (point))))
-      (goto-char (car bounds))
-      (when (= start (point))
-        (let* ((parse-tree (yaml-pro--get-buffer-tree))
-               (bounds (yaml-pro-get-parent-block parse-tree (point))))
-          (goto-char (car bounds))
-          (when (= start (point))
-            ;; the block we're at and it's parent have the same start,
-            ;; move back one char and try again
-            (forward-char -1)
-            (yaml-pro-up-level))))
-      (when (and (bolp) (looking-at "[ \t]"))
-        ;; Don't let the command end at a block that begins a line
-        (yaml-pro-up-level)))))
+  (yaml-pro-with-ensure-overlays
+   (if (and (bolp) (not (looking-at "[ \n\t#]")))
+       (goto-char (point-min))
+     (let* ((start (point))
+            (parse-tree (yaml-pro--get-buffer-tree))
+            (bounds (yaml-pro-get-block-bounds parse-tree (point))))
+       (goto-char (car bounds))
+       (when (= start (point))
+         (let* ((parse-tree (yaml-pro--get-buffer-tree))
+                (bounds (yaml-pro-get-parent-block parse-tree (point))))
+           (goto-char (car bounds))
+           (when (= start (point))
+             ;; the block we're at and it's parent have the same start,
+             ;; move back one char and try again
+             (forward-char -1)
+             (yaml-pro-up-level))))
+       (when (and (bolp) (looking-at "[ \t]"))
+         ;; Don't let the command end at a block that begins a line
+         (yaml-pro-up-level))))))
 
 (defun yaml-pro-kill-subtree ()
   "Kill the entire subtree located at the current point."
   (interactive)
-  (let* ((parse-tree (yaml-pro--get-buffer-tree))
-         (bounds (yaml-pro-get-block-bounds parse-tree (point)))
-         (start (car bounds))
-         (end (cadr bounds)))
-    (when (save-excursion
-            (goto-char end)
-            (looking-back "\n" (- (point) 2)))
-      (setq end (1- end)))
-    (kill-region start end)))
+  (yaml-pro-with-ensure-overlays
+   (let* ((parse-tree (yaml-pro--get-buffer-tree))
+          (bounds (yaml-pro-get-block-bounds parse-tree (point)))
+          (start (car bounds))
+          (end (cadr bounds)))
+     (when (save-excursion
+             (goto-char end)
+             (looking-back "\n" (- (point) 2)))
+       (setq end (1- end)))
+     (kill-region start end))))
 
 (defun yaml-pro-prev-subtree ()
   "Move the point to the previous sibling subtree."
   (interactive)
-  (let* ((start-pos (point))
-         (parse-tree (yaml-pro--get-buffer-tree))
-         (at-bounds (yaml-pro-get-block-bounds parse-tree (point))))
-    (goto-char (car at-bounds))
-    (let ((at-col (current-column))
-          (at-dash-p (looking-at "-")))
-      (catch 'done
-        (while (not (bobp))
-          (forward-line -1)
-          (while (looking-at "[ \n]*$")
-            (forward-line -1))
-          (if at-dash-p
-              (skip-chars-forward " \n")
-            (skip-chars-forward " \n-"))
-          (when (and (< (current-column) at-col)
-                     (not (looking-at "#")))
-            (goto-char start-pos)
-            (ding)
-            (throw 'done nil))
-          (when (and (= (current-column) at-col)
-                     (not (looking-at "#")))
-            (throw 'done t)))
-        (if (looking-at "#")
-            (progn
-              (goto-char start-pos)
-              (ding)
-              nil)
-          t)))))
+  (yaml-pro-with-ensure-overlays
+   (let* ((start-pos (point))
+          (parse-tree (yaml-pro--get-buffer-tree))
+          (at-bounds (yaml-pro-get-block-bounds parse-tree (point))))
+     (goto-char (car at-bounds))
+     (let ((at-col (current-column))
+           (at-dash-p (looking-at "-")))
+       (catch 'done
+         (while (not (bobp))
+           (forward-line -1)
+           (while (looking-at "[ \n]*$")
+             (forward-line -1))
+           (if at-dash-p
+               (skip-chars-forward " \n")
+             (skip-chars-forward " \n-"))
+           (when (and (< (current-column) at-col)
+                      (not (looking-at "#")))
+             (goto-char start-pos)
+             (ding)
+             (throw 'done nil))
+           (when (and (= (current-column) at-col)
+                      (not (looking-at "#")))
+             (throw 'done t)))
+         (if (looking-at "#")
+             (progn
+               (goto-char start-pos)
+               (ding)
+               nil)
+           t))))))
 
 (defun yaml-pro-next-subtree ()
   "Move the point to the next sibling subtree."
   (interactive)
-  (let* ((start-pos (point))
-         (start-col (current-column))
-         (parse-tree (yaml-pro--get-buffer-tree))
-         (at-bounds (yaml-pro-get-block-bounds parse-tree (point))))
-    (goto-char (cadr at-bounds))
-    (skip-chars-forward " \n")
-    (if (or (not (= start-col (current-column)))
-            (eobp))
-        (progn
-          (ding)
-          (goto-char start-pos)
-          nil)
-      t)))
+  (yaml-pro-with-ensure-overlays
+   (let* ((start-pos (point))
+          (start-col (current-column))
+          (parse-tree (yaml-pro--get-buffer-tree))
+          (at-bounds (yaml-pro-get-block-bounds parse-tree (point))))
+     (goto-char (cadr at-bounds))
+     (skip-chars-forward " \n")
+     (if (or (not (= start-col (current-column)))
+             (eobp))
+         (progn
+           (ding)
+           (goto-char start-pos)
+           nil)
+       t))))
 
 (defun yaml-pro-indent-subtree ()
   "Indent the current subtree by one level.
@@ -756,27 +764,33 @@ Ensure that yaml.el package installed and at version %s"
 
 (defun yaml-pro--go-convert-template ()
   "Transform a Go templated file to something that is parsable."
-  (save-excursion
-    (goto-char (point-min))
-    (while (search-forward-regexp "{{.?*}}" nil t)
-      (if (yaml-pro--go-on-blank-line-p)
-          (progn
-            (goto-char (match-beginning 0))
-            (insert "#")
-            (let ((ov (make-overlay (1- (point)) (point))))
-              (overlay-put ov 'invisible t)
-              (add-to-list 'yaml-pro-template-overlays ov)
-              (goto-char (match-end 0))))
-        (insert "'")
-        (let ((ov (make-overlay (1- (point)) (point))))
-          (overlay-put ov 'invisible t)
-          (add-to-list 'yaml-pro-template-overlays ov))
-        (goto-char (match-beginning 0))
-        (insert "'")
-        (let ((ov (make-overlay (1- (point)) (point))))
-          (overlay-put ov 'invisible t)
-          (add-to-list 'yaml-pro-template-overlays ov))
-        (goto-char (match-end 0))))))
+  (if yaml-pro--go-skip-overlays
+      (setq yaml-pro--go-skip-overlays nil)
+    (save-excursion
+      (yaml-pro--delete-template-overlays)
+      (goto-char (point-min))
+      (while (search-forward-regexp "{{.?*}}" nil t)
+        (if (yaml-pro--go-on-blank-line-p)
+            (progn
+              (goto-char (match-beginning 0))
+              (insert "#")
+              (let ((ov (make-overlay (1- (point)) (point))))
+                (overlay-put ov 'invisible t)
+                (overlay-put ov 'yaml-pro-type 'comment)
+                (add-to-list 'yaml-pro-template-overlays ov)
+                (goto-char (match-end 0))))
+          (insert "'")
+          (let ((ov (make-overlay (1- (point)) (point))))
+            (overlay-put ov 'invisible t)
+            (overlay-put ov 'yaml-pro-type 'quote-end)
+            (add-to-list 'yaml-pro-template-overlays ov))
+          (goto-char (match-beginning 0))
+          (insert "'")
+          (let ((ov (make-overlay (1- (point)) (point))))
+            (overlay-put ov 'invisible t)
+            (overlay-put ov 'yaml-pro-type 'quote-start)
+            (add-to-list 'yaml-pro-template-overlays ov))
+          (goto-char (match-end 0)))))))
 
 (defun yaml-pro--go-before-save-hook ()
   "Ensrue that before saving, the extra comments/quotes are removed."
@@ -794,6 +808,16 @@ Ensure that yaml.el package installed and at version %s"
 (defun yaml-pro--go-after-change-hook (_ _ _)
   "")
 
+(defvar-local yaml-pro--go-skip-overlays nil
+  "When nil, skip the processing of overlays in Go-templated buffer.")
+
+(defmacro yaml-pro-with-ensure-overlays (&rest body)
+  `(progn
+     (when yaml-pro-go-template-mode
+       (yaml-pro--go-convert-template)
+       (setq yaml-pro--go-skip-overlays t))
+     ,@body))
+
 (define-minor-mode yaml-pro-go-template-mode
   "Add overlays to render Go templates in a YAML file parsable."
   :init-value nil
@@ -808,12 +832,10 @@ Ensure that yaml.el package installed and at version %s"
 Ensure that yaml.el package installed and at version %s"
                  yaml-pro-required-yaml-parser-version))
         (when (equal mode-name "YAML")
-          ;;(add-hook 'after-change-functions #'yaml-pro--go-after-change-hook nil t)
           (add-hook 'before-save-hook #'yaml-pro--go-before-save-hook nil t)
           (add-hook 'after-save-hook #'yaml-pro--go-after-save-hook nil t)
           (add-hook 'pre-command-hook #'yaml-pro--go-before-save-hook nil t)
-          (add-hook 'post-command-hook #'yaml-pro--go-post-command-hook nil t)
-          (yaml-pro--delete-template-overlays)))
+          (add-hook 'post-command-hook #'yaml-pro--go-post-command-hook nil t)))
     ;;(remove-hook 'after-change-functions #'yaml-pro--after-change-hook t)
     (remove-hook 'before-save-hook #'yaml-pro--go-before-save-hook t)
     (remove-hook 'after-save-hook #'yaml-pro--go-after-save-hook t)
