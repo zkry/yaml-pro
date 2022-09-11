@@ -121,7 +121,7 @@ Find subsection based off of POINT if provided."
 
 (defun yaml-pro--get-buffer-tree ()
   "Return the cached buffer-tree if exists, else regenerate it."
-  (or yaml-pro-buffer-tree
+  (or (and (not yaml-pro-go-template-mode) yaml-pro-buffer-tree)
       (if (not (yaml-pro--use-fast-p))
           (let ((tree (yaml-parse-tree (buffer-string))))
             (setq yaml-pro-buffer-tree tree)
@@ -669,32 +669,34 @@ Indentation is controlled by the variable `yaml-pro-indent'."
 (defun yaml-pro-move-subtree-up ()
   "Swap the current subtree with the previous one."
   (interactive)
-  (let* ((parse-tree (yaml-pro--get-buffer-tree))
-         (at-bounds (yaml-pro-get-block-bounds parse-tree (point)))
-         (at-contents (buffer-substring (car at-bounds) (cadr at-bounds)))
-         (prev-bounds (save-excursion
-                        (let ((ok (yaml-pro-prev-subtree)))
-                          (and ok (yaml-pro-get-block-bounds parse-tree
-                                                             (point))))))
-         (prev-contents (and prev-bounds
-                             (buffer-substring (car prev-bounds)
-                                               (cadr prev-bounds)))))
-    (when (not prev-bounds)
-      (error "Can't move subtree"))
-    (goto-char (car at-bounds))
-    (delete-region (car at-bounds) (cadr at-bounds))
-    (insert prev-contents)
-    (goto-char (car prev-bounds))
-    (delete-region (car prev-bounds) (cadr prev-bounds))
-    (insert at-contents)
-    (goto-char (car prev-bounds))))
+  (yaml-pro-with-ensure-overlays
+   (let* ((parse-tree (yaml-pro--get-buffer-tree))
+          (at-bounds (yaml-pro-get-block-bounds parse-tree (point)))
+          (at-contents (buffer-substring (car at-bounds) (cadr at-bounds)))
+          (prev-bounds (save-excursion
+                         (let ((ok (yaml-pro-prev-subtree)))
+                           (and ok (yaml-pro-get-block-bounds parse-tree
+                                                              (point))))))
+          (prev-contents (and prev-bounds
+                              (buffer-substring (car prev-bounds)
+                                                (cadr prev-bounds)))))
+     (when (not prev-bounds)
+       (error "Can't move subtree"))
+     (goto-char (car at-bounds))
+     (delete-region (car at-bounds) (cadr at-bounds))
+     (insert prev-contents)
+     (goto-char (car prev-bounds))
+     (delete-region (car prev-bounds) (cadr prev-bounds))
+     (insert at-contents)
+     (goto-char (car prev-bounds)))))
 
 (defun yaml-pro-move-subtree-down ()
   "Swap the current subtree with the previous one."
   (interactive)
-  (yaml-pro-next-subtree)
-  (yaml-pro-move-subtree-up)
-  (yaml-pro-next-subtree))
+  (yaml-pro-with-ensure-overlays
+   (yaml-pro-next-subtree)
+   (yaml-pro-move-subtree-up)
+   (yaml-pro-next-subtree)))
 
 (defconst yaml-pro-mode-map
   (let ((map (make-sparse-keymap)))
@@ -762,10 +764,20 @@ Ensure that yaml.el package installed and at version %s"
       (delete-overlay ov)))
   (setq yaml-pro-template-overlays nil))
 
+(defun yaml-pro--go-delete-overlays ()
+  (save-excursion
+    (dolist (ov yaml-pro-template-overlays)
+      (let ((start (overlay-start ov))
+            (end (overlay-end ov))))
+      (delete-overlay ov)))
+  (setq yaml-pro-template-overlays nil))
+
 (defun yaml-pro--go-convert-template ()
   "Transform a Go templated file to something that is parsable."
   (if yaml-pro--go-skip-overlays
-      (setq yaml-pro--go-skip-overlays nil)
+      (progn
+        (yaml-pro--go-revert-template-extra)
+        (setq yaml-pro--go-skip-overlays nil))
     (save-excursion
       (yaml-pro--delete-template-overlays)
       (goto-char (point-min))
@@ -792,6 +804,45 @@ Ensure that yaml.el package installed and at version %s"
             (add-to-list 'yaml-pro-template-overlays ov))
           (goto-char (match-end 0)))))))
 
+(defun yaml-pro--go-convert-template-extra ()
+  ""
+  (save-excursion
+    (dolist (ov yaml-pro-template-overlays)
+      (pcase (overlay-get ov 'yaml-pro-type)
+        ('comment
+         (goto-char (1+ (overlay-start ov)))
+         (insert "|||YAML-PRO-COMMENT|||"))
+        ('quote-end
+         (goto-char (overlay-start ov))
+         (insert "|||YAML-PRO-QUOTE-END|||"))
+        ('quote-start
+         (goto-char (1+ (overlay-start ov)))
+         (insert "|||YAML-PRO-QUOTE-START|||"))))))
+
+(defun yaml-pro--go-revert-template-extra ()
+  (save-excursion
+    (goto-char (point-min))
+    (while (search-forward "|||YAML-PRO-COMMENT|||" nil t)
+      (replace-match "")
+      (let ((ov (make-overlay (1- (point)) (point))))
+        (overlay-put ov 'invisible t)
+        (overlay-put ov 'yaml-pro-type 'comment)
+        (add-to-list 'yaml-pro-template-overlays ov)))
+    (goto-char (point-min))
+    (while (search-forward "|||YAML-PRO-QUOTE-END|||" nil t)
+      (replace-match "")
+      (let ((ov (make-overlay (point) (1+ (point)))))
+        (overlay-put ov 'invisible t)
+        (overlay-put ov 'yaml-pro-type 'quote-end)
+        (add-to-list 'yaml-pro-template-overlays ov)))
+    (goto-char (point-min))
+    (while (search-forward "|||YAML-PRO-QUOTE-START|||" nil t)
+      (replace-match "")
+      (let ((ov (make-overlay (1- (point)) (point))))
+        (overlay-put ov 'invisible t)
+        (overlay-put ov 'yaml-pro-type 'quote-start)
+        (add-to-list 'yaml-pro-template-overlays ov)))))
+
 (defun yaml-pro--go-before-save-hook ()
   "Ensrue that before saving, the extra comments/quotes are removed."
   (yaml-pro--delete-template-overlays))
@@ -812,9 +863,12 @@ Ensure that yaml.el package installed and at version %s"
   "When nil, skip the processing of overlays in Go-templated buffer.")
 
 (defmacro yaml-pro-with-ensure-overlays (&rest body)
+  (declare (indent 0) (debug t))
   `(progn
-     (when yaml-pro-go-template-mode
+     (when (and yaml-pro-go-template-mode (not yaml-pro--go-skip-overlays))
        (yaml-pro--go-convert-template)
+       (yaml-pro--go-convert-template-extra)
+       (yaml-pro--go-delete-overlays)
        (setq yaml-pro--go-skip-overlays t))
      ,@body))
 
