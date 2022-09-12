@@ -854,7 +854,13 @@ Ensure that yaml.el package installed and at version %s"
 
 (defun yaml-pro--go-post-command-hook ()
   "After command regenerate comments and quote."
-  (yaml-pro--go-convert-template))
+  (with-buffer-modified-unmodified
+   (yaml-pro--go-convert-template)))
+
+(defun yaml-pro--go-before-command-hook ()
+  "Ensrue that before saving, the extra comments/quotes are removed."
+  (with-buffer-modified-unmodified
+   (yaml-pro--delete-template-overlays)))
 
 (defun yaml-pro--go-after-change-hook (_ _ _)
   "")
@@ -888,7 +894,7 @@ Ensure that yaml.el package installed and at version %s"
         (when (equal mode-name "YAML")
           (add-hook 'before-save-hook #'yaml-pro--go-before-save-hook nil t)
           (add-hook 'after-save-hook #'yaml-pro--go-after-save-hook nil t)
-          (add-hook 'pre-command-hook #'yaml-pro--go-before-save-hook nil t)
+          (add-hook 'pre-command-hook #'yaml-pro--go-before-command-hook nil t)
           (add-hook 'post-command-hook #'yaml-pro--go-post-command-hook nil t)))
     ;;(remove-hook 'after-change-functions #'yaml-pro--after-change-hook t)
     (remove-hook 'before-save-hook #'yaml-pro--go-before-save-hook t)
