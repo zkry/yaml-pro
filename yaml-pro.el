@@ -756,6 +756,7 @@ Ensure that yaml.el package installed and at version %s"
 (defvar yaml-pro-template-overlays nil)
 
 (defun yaml-pro--delete-template-overlays ()
+  "Delete the overlays and text in the current buffer."
   (save-excursion
     (dolist (ov yaml-pro-template-overlays)
       (let ((start (overlay-start ov))
@@ -765,6 +766,7 @@ Ensure that yaml.el package installed and at version %s"
   (setq yaml-pro-template-overlays nil))
 
 (defun yaml-pro--go-delete-overlays ()
+  "Delete template overlays in the current buffer."
   (save-excursion
     (dolist (ov yaml-pro-template-overlays)
       (let ((start (overlay-start ov))
@@ -809,7 +811,7 @@ Ensure that yaml.el package installed and at version %s"
           (goto-char (match-end 0)))))))
 
 (defun yaml-pro--go-convert-template-extra ()
-  ""
+  "Add template indicators to around tempate escape characters."
   (save-excursion
     (dolist (ov yaml-pro-template-overlays)
       (pcase (overlay-get ov 'yaml-pro-type)
@@ -824,6 +826,7 @@ Ensure that yaml.el package installed and at version %s"
          (insert "|||YAML-PRO-QUOTE-START|||"))))))
 
 (defun yaml-pro--go-revert-template-extra ()
+  "Convert template indicators to their respective overlays."
   (save-excursion
     (goto-char (point-min))
     (while (search-forward "|||YAML-PRO-COMMENT|||" nil t)
@@ -866,13 +869,11 @@ Ensure that yaml.el package installed and at version %s"
   (with-buffer-modified-unmodified
    (yaml-pro--delete-template-overlays)))
 
-(defun yaml-pro--go-after-change-hook (_ _ _)
-  "")
-
 (defvar-local yaml-pro--go-skip-overlays nil
   "When nil, skip the processing of overlays in Go-templated buffer.")
 
 (defmacro yaml-pro-with-ensure-overlays (&rest body)
+  "Execute BODY while ensuring the the templates in the buffer are escaped."
   (declare (indent 0) (debug t))
   `(progn
      (when (and yaml-pro-go-template-mode (not yaml-pro--go-skip-overlays))
@@ -900,7 +901,6 @@ Ensure that yaml.el package installed and at version %s"
           (add-hook 'after-save-hook #'yaml-pro--go-after-save-hook nil t)
           (add-hook 'pre-command-hook #'yaml-pro--go-before-command-hook nil t)
           (add-hook 'post-command-hook #'yaml-pro--go-post-command-hook nil t)))
-    ;;(remove-hook 'after-change-functions #'yaml-pro--after-change-hook t)
     (remove-hook 'before-save-hook #'yaml-pro--go-before-save-hook t)
     (remove-hook 'after-save-hook #'yaml-pro--go-after-save-hook t)
     (remove-hook 'pre-command-hook #'yaml-pro--go-before-save-hook t)
