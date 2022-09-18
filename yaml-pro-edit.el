@@ -375,7 +375,9 @@ dedicated buffer")))))
           ;; otherwise use its scalar value (to not show quotes)
           (yaml-pro-edit-initialize-buffer
            parent-buffer b at-scalar type init-func path))
-        (switch-to-buffer-other-window b)))))
+        (let ((window (display-buffer b)))
+          (when window
+            (select-window window)))))))
 
 (provide 'yaml-pro-edit)
 
