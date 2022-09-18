@@ -59,12 +59,13 @@ Note that this isn't fully compatable with every command."
   '((t :inherit 'font-lock-comment-face))
   "Face for fold replacement text.")
 
+
 (defvar yaml-pro-indent (if (boundp 'yaml-indent)
                             yaml-indent
                           2)
   "Default indentation to use for yaml-pro.")
 
-(defvar yaml-pro-template-regexp "{{.?*}}"
+(defconst yaml-pro-template-regexp "{{[^\n]?*}}"
   "Template regexp to find template items needing to be escaped.")
 
 (defvar-local yaml-pro--skip-template-overlays nil
@@ -792,31 +793,13 @@ Ensure that yaml.el package installed and at version %s"
       (yaml-pro--delete-template-overlays)
       (goto-char (point-min))
       (while (search-forward-regexp yaml-pro-template-regexp nil t)
-        (if (yaml-pro--on-blank-line-p)
-            (progn
-              (goto-char (match-beginning 0))
-              (unless (or (nth 3 (syntax-ppss))
-                          (nth 4 (syntax-ppss)))
-                (insert "#")
-                (let ((ov (make-overlay (1- (point)) (point))))
-                  (overlay-put ov 'invisible t)
-                  (overlay-put ov 'yaml-pro-type 'comment)
-                  (add-to-list 'yaml-pro-template-overlays ov)))
-              (goto-char (match-end 0)))
-          (unless (or (nth 3 (syntax-ppss))
-                      (nth 4 (syntax-ppss)))
-            (insert "'")
-            (let ((ov (make-overlay (1- (point)) (point))))
-              (overlay-put ov 'invisible t)
-              (overlay-put ov 'yaml-pro-type 'quote-end)
-              (add-to-list 'yaml-pro-template-overlays ov))
-            (goto-char (match-beginning 0))
-            (insert "'")
-            (let ((ov (make-overlay (1- (point)) (point))))
-              (overlay-put ov 'invisible t)
-              (overlay-put ov 'yaml-pro-type 'quote-start)
-              (add-to-list 'yaml-pro-template-overlays ov)))
-          (goto-char (match-end 0)))))))
+        (goto-char (match-beginning 0))
+        (insert "#")
+        (let ((ov (make-overlay (1- (point)) (point))))
+          (overlay-put ov 'invisible t)
+          (overlay-put ov 'yaml-pro-type 'comment)
+          (add-to-list 'yaml-pro-template-overlays ov))
+        (goto-char (match-end 0))))))
 
 (defun yaml-pro--convert-template-extra ()
   "Add template indicators to around tempate escape characters."
@@ -825,13 +808,7 @@ Ensure that yaml.el package installed and at version %s"
       (pcase (overlay-get ov 'yaml-pro-type)
         ('comment
          (goto-char (1+ (overlay-start ov)))
-         (insert "|||YAML-PRO-COMMENT|||"))
-        ('quote-end
-         (goto-char (overlay-start ov))
-         (insert "|||YAML-PRO-QUOTE-END|||"))
-        ('quote-start
-         (goto-char (1+ (overlay-start ov)))
-         (insert "|||YAML-PRO-QUOTE-START|||"))))))
+         (insert "|||YAML-PRO-COMMENT|||"))))))
 
 (defun yaml-pro--revert-template-extra ()
   "Convert template indicators to their respective overlays."
@@ -842,40 +819,35 @@ Ensure that yaml.el package installed and at version %s"
       (let ((ov (make-overlay (1- (point)) (point))))
         (overlay-put ov 'invisible t)
         (overlay-put ov 'yaml-pro-type 'comment)
-        (add-to-list 'yaml-pro-template-overlays ov)))
-    (goto-char (point-min))
-    (while (search-forward "|||YAML-PRO-QUOTE-END|||" nil t)
-      (replace-match "")
-      (let ((ov (make-overlay (point) (1+ (point)))))
-        (overlay-put ov 'invisible t)
-        (overlay-put ov 'yaml-pro-type 'quote-end)
-        (add-to-list 'yaml-pro-template-overlays ov)))
-    (goto-char (point-min))
-    (while (search-forward "|||YAML-PRO-QUOTE-START|||" nil t)
-      (replace-match "")
-      (let ((ov (make-overlay (1- (point)) (point))))
-        (overlay-put ov 'invisible t)
-        (overlay-put ov 'yaml-pro-type 'quote-start)
         (add-to-list 'yaml-pro-template-overlays ov)))))
 
 (defun yaml-pro--before-save-hook ()
   "Ensrue that before saving, the extra comments/quotes are removed."
-  (yaml-pro--delete-template-overlays))
+  (let ((undo-inhibit-record-point t))
+    (yaml-pro--delete-template-overlays)))
 
 (defun yaml-pro--after-save-hook ()
   "After save, regenerate comments and quote."
-  (yaml-pro--convert-template)
-  (set-buffer-modified-p nil))
+  (let ((undo-inhibit-record-point t))
+    (yaml-pro--convert-template)
+    (set-buffer-modified-p nil)))
 
 (defun yaml-pro--post-command-hook ()
   "After command regenerate comments and quote."
-  (with-buffer-modified-unmodified
-   (yaml-pro--convert-template)))
+  (unless undo-in-progress
+    (with-buffer-modified-unmodified
+     (let ((old-undo buffer-undo-list)
+           (undo-inhibit-record-point t))
+       (yaml-pro--convert-template)))))
 
 (defun yaml-pro--before-command-hook ()
   "Ensrue that before saving, the extra comments/quotes are removed."
-  (with-buffer-modified-unmodified
-   (yaml-pro--delete-template-overlays)))
+  (unless undo-in-progress
+    (undo-boundary)
+    (with-buffer-modified-unmodified
+     (let ((old-undo buffer-undo-list)
+           (undo-inhibit-record-point t))
+       (yaml-pro--delete-template-overlays)))))
 
 (defmacro yaml-pro-with-ensure-overlays (&rest body)
   "Execute BODY while ensuring the the templates in the buffer are escaped."
@@ -887,6 +859,39 @@ Ensure that yaml.el package installed and at version %s"
        (yaml-pro--delete-overlays)
        (setq yaml-pro--skip-template-overlays t))
      ,@body))
+
+(defun yaml-pro--hide-templates ()
+  "Scan document for templates and convert them into comments."
+  (save-excursion
+    (goto-char (point-min))
+    (while (search-forward-regexp yaml-pro-template-regexp nil t)
+      (goto-char (match-beginning 0))
+      (let ((orig-char (buffer-substring-no-properties (point) (1+ (point)))))
+        (delete-char 1)
+        (insert "#")
+        (let ((ov (make-overlay (1- (point)) (point))))
+          (overlay-put ov 'yaml-pro-template (string-to-char orig-char))
+          (add-to-list 'yaml-pro-template-overlays ov))))))
+
+(defun yaml-pro--restore-templates ()
+  "Remove the temporary template comments and restore template structure.."
+  (save-excursion
+    (dolist (ov yaml-pro-template-overlays)
+      (let ((orig-char (overlay-get ov 'yaml-pro-template)))
+        (goto-char (overlay-start ov))
+        (delete-char 1)
+        (insert orig-char))))
+  (setq yaml-pro-template-overlays nil))
+
+(defun yaml-pro-convert-template (orig-fun &rest args)
+  ""
+  (yaml-pro--hide-templates)
+  (apply orig-fun args)
+  (yaml-pro--restore-templates))
+
+(advice-add 'lsp-request-async :around #'yaml-pro-convert-template)
+
+(advice-add 'lsp-request :around #'yaml-pro-convert-template)
 
 ;;;###autoload
 (define-minor-mode yaml-pro-template-mode
