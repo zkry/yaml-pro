@@ -602,7 +602,9 @@ PATH is the current path we have already traversed down."
       t)))
 
 (defun yaml-pro-indent-subtree ()
-  "Swap the current subtree with the previous one."
+  "Indent the current subtree by one level.
+
+Indentation is controlled by the variable `yaml-indent'."
   (interactive)
   (let* ((parse-tree (yaml-pro--get-buffer-tree))
          (at-bounds (yaml-pro-get-block-bounds parse-tree (point))))
@@ -623,7 +625,9 @@ PATH is the current path we have already traversed down."
             (forward-line -1)))))))
 
 (defun yaml-pro-unindent-subtree ()
-  "Swap the current subtree with the previous one."
+  "Unindent the current subtree by one level.
+
+Indentation is controlled by the variable `yaml-indent'."
   (interactive)
   (let* ((parse-tree (yaml-pro--get-buffer-tree))
          (at-bounds (yaml-pro-get-block-bounds parse-tree (point))))
