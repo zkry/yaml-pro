@@ -601,6 +601,54 @@ PATH is the current path we have already traversed down."
           nil)
       t)))
 
+(defun yaml-pro-indent-subtree ()
+  "Swap the current subtree with the previous one."
+  (interactive)
+  (let* ((parse-tree (yaml-pro--get-buffer-tree))
+         (at-bounds (yaml-pro-get-block-bounds parse-tree (point))))
+    (save-excursion
+      (goto-char (car at-bounds))
+      (if (not (looking-back "^[ ]*" nil))
+          (progn
+            (forward-line 0)
+            (skip-chars-forward " ")
+            (yaml-pro-indent-subtree))
+        (let ((beginning-line (line-number-at-pos)))
+          (goto-char (cadr at-bounds))
+          (when (looking-back "\n" (- (point) 2))
+            (forward-char -1))
+          (forward-line 0)
+          (while (>= (line-number-at-pos) beginning-line)
+            (insert (make-string yaml-indent ?\s))
+            (forward-line -1)))))))
+
+(defun yaml-pro-unindent-subtree ()
+  "Swap the current subtree with the previous one."
+  (interactive)
+  (let* ((parse-tree (yaml-pro--get-buffer-tree))
+         (at-bounds (yaml-pro-get-block-bounds parse-tree (point))))
+    (save-excursion
+      (goto-char (car at-bounds))
+      ;; ensure that the subtree can be unintented
+      (save-excursion
+        (forward-line 0)
+        (unless (looking-at-p (make-string yaml-indent ?\s))
+          (error "subtree can't be unintented further.")))
+      (if (not (looking-back "^[ ]*" nil))
+          (progn
+            (forward-line 0)
+            (skip-chars-forward " ")
+            (yaml-pro-indent-subtree))
+        (let ((beginning-line (line-number-at-pos)))
+          (goto-char (cadr at-bounds))
+          (when (looking-back "\n" (- (point) 2))
+            (forward-char -1))
+          (forward-line 0)
+          (while (>= (line-number-at-pos) beginning-line)
+            (when (looking-at-p (make-string yaml-indent ?\s))
+              (delete-char yaml-indent))
+            (forward-line -1)))))))
+
 (defun yaml-pro-move-subtree-up ()
   "Swap the current subtree with the previous one."
   (interactive)
@@ -648,6 +696,10 @@ PATH is the current path we have already traversed down."
       (define-key map (kbd "s-<down>") #'yaml-pro-move-subtree-down)
 
       (define-key map (kbd "C-c '") #'yaml-pro-edit-scalar)
+
+      (define-key map (kbd "C-c >") #'yaml-pro-indent-subtree)
+
+      (define-key map (kbd "C-c <") #'yaml-pro-unindent-subtree)
 
       (define-key map (kbd "C-c C-j") (if (featurep 'consult)
                                           #'yaml-pro-consult-jump
