@@ -22,15 +22,19 @@ buffer and convert between the various styles with ease.
 
 ### Moving subtrees up and down
 
-![jumping feature](./docs/move-subtree.gif)
+![moving subtrees feature](./docs/move-subtree.gif)
 
 ### Folding subtrees
 
-![jumping feature](./docs/folding.gif)
+![folding feature](./docs/folding.gif)
 
 ### Killing subtrees
 
-![jumping feature](./docs/killing-subtree.gif)
+![killing feature](./docs/killing-subtree.gif)
+
+### Indenting subtrees
+
+![indenting feature](./docs/indenting.gif)
 
 # Installation
 
@@ -57,6 +61,8 @@ have the following commands available (with default keybindings).
 - **yaml-pro-prev-subtree** (<kbd>C-c</kbd> <kbd>C-p</kbd>)
 - **yaml-pro-fold-at-point** (<kbd>C-c</kbd> <kbd>C-f</kbd>)
 - **yaml-pro-unfold-at-point** (<kbd>C-c</kbd> <kbd>C-o</kbd>)
+- **yaml-pro-indent-subtree** (<kbd>C-c ></kbd>)
+- **yaml-pro-unindent-subtree** (<kbd>C-c <</kbd>)
 - **yaml-pro-move-subtree-up** (<kbd>s-up</kbd>)
 - **yaml-pro-move-subtree-down** (<kbd>s-down</kbd>)
 - **yaml-pro-edit-scalar** (<kbd>C-c '</kbd>)
