@@ -59,6 +59,11 @@ Note that this isn't fully compatable with every command."
   '((t :inherit 'font-lock-comment-face))
   "Face for fold replacement text.")
 
+(defvar yaml-pro-indent (if (boundp 'yaml-indent)
+                            yaml-indent
+                          2)
+  "Default indentation to use for yaml-pro.")
+
 (defvar-local yaml-pro-buffer-tree nil)
 
 (defun yaml-pro--offset-parse-tree (tree offset)
@@ -604,7 +609,7 @@ PATH is the current path we have already traversed down."
 (defun yaml-pro-indent-subtree ()
   "Indent the current subtree by one level.
 
-Indentation is controlled by the variable `yaml-indent'."
+Indentation is controlled by the variable `yaml-pro-indent'."
   (interactive)
   (let* ((parse-tree (yaml-pro--get-buffer-tree))
          (at-bounds (yaml-pro-get-block-bounds parse-tree (point))))
@@ -621,13 +626,13 @@ Indentation is controlled by the variable `yaml-indent'."
             (forward-char -1))
           (forward-line 0)
           (while (>= (line-number-at-pos) beginning-line)
-            (insert (make-string yaml-indent ?\s))
+            (insert (make-string yaml-pro-indent ?\s))
             (forward-line -1)))))))
 
 (defun yaml-pro-unindent-subtree ()
   "Unindent the current subtree by one level.
 
-Indentation is controlled by the variable `yaml-indent'."
+Indentation is controlled by the variable `yaml-pro-indent'."
   (interactive)
   (let* ((parse-tree (yaml-pro--get-buffer-tree))
          (at-bounds (yaml-pro-get-block-bounds parse-tree (point))))
@@ -636,7 +641,7 @@ Indentation is controlled by the variable `yaml-indent'."
       ;; ensure that the subtree can be unintented
       (save-excursion
         (forward-line 0)
-        (unless (looking-at-p (make-string yaml-indent ?\s))
+        (unless (looking-at-p (make-string yaml-pro-indent ?\s))
           (error "subtree can't be unintented further.")))
       (if (not (looking-back "^[ ]*" nil))
           (progn
@@ -649,8 +654,8 @@ Indentation is controlled by the variable `yaml-indent'."
             (forward-char -1))
           (forward-line 0)
           (while (>= (line-number-at-pos) beginning-line)
-            (when (looking-at-p (make-string yaml-indent ?\s))
-              (delete-char yaml-indent))
+            (when (looking-at-p (make-string yaml-pro-indent ?\s))
+              (delete-char yaml-pro-indent))
             (forward-line -1)))))))
 
 (defun yaml-pro-move-subtree-up ()
