@@ -6,6 +6,10 @@ a parse tree and is then able to do things like move between subtrees,
 delete entire sections of YAML (even if it's written in JSON style),
 and swap subtrees.
 
+**NOTE: there is planned work for yaml-pro to be implemented with
+tree-sitter.  This should provide a huge speed increase to all of
+these actions.**
+
 # Demo
 
 ### Editing text in detached buffer
