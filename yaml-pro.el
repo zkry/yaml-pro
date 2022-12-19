@@ -47,6 +47,255 @@
   :prefix "yaml-pro-"
   :group 'convenience)
 
+
+;;; yaml-pro tree sitter
+
+(defun yaml-pro-ts--until-mapping (node)
+  "Recursively look up from NODE returning first `block_mapping_pair'."
+  (treesit-parent-until
+   node
+   (lambda (node)
+     (equal (treesit-node-type node) "block_mapping_pair"))))
+
+(defun yaml-pro-ts--until-mapping-or-list (node)
+  "Recursively look up from NODE returning first mapping or sequence item."
+  (treesit-parent-until
+   node
+   (lambda (node)
+     (or
+      (equal (treesit-node-type node) "block_mapping_pair")
+      (equal (treesit-node-type node) "block_sequence_item")))))
+
+(defun yaml-pro-ts-kill-subtree ()
+  "Kill the entire subtree located at the current-point."
+  (interactive)
+  (let* ((at-node (treesit-node-at (point)))
+         (tree-top (yaml-pro-ts--until-mapping at-node)))
+    (when tree-top
+      (kill-region (treesit-node-start tree-top)
+                   (treesit-node-end tree-top)))))
+
+(defun yaml-pro-ts-up-level ()
+  "Move the point to the parent tree."
+  (interactive)
+  (let* ((at-node (treesit-node-at (point)))
+         (tree-top (yaml-pro-ts--until-mapping at-node))
+         (parent-tree-top (and tree-top (yaml-pro-ts--until-mapping tree-top))))
+    (when parent-tree-top
+      (goto-char (treesit-node-start parent-tree-top)))))
+
+
+(defun yaml-pro-ts-prev-mapping-node (tree-top type)
+  "Return nearest previous sibling node of TREE-TOP of type TYPE."
+  (interactive)
+  (setq tree-top (treesit-node-prev-sibling tree-top))
+  (while (and tree-top
+              (not (equal (treesit-node-type tree-top) type)))
+    (setq tree-top (treesit-node-prev-sibling tree-top)))
+  tree-top)
+
+(defun yaml-pro-ts-next-mapping-node (tree-top type)
+  "Return nearest next sibling node of TREE-TOP of type TYPE."
+  (interactive)
+  (setq tree-top (treesit-node-next-sibling tree-top))
+  (while (and tree-top
+              (not (equal (treesit-node-type tree-top) type)))
+    (setq tree-top (treesit-node-next-sibling tree-top)))
+  tree-top)
+
+
+(defun yaml-pro-ts-prev-subtree ()
+  "Move the point to the previous subtree."
+  (interactive)
+  (let* ((at-node (treesit-node-at (point)))
+         (tree-top (yaml-pro-ts--until-mapping at-node))
+         (prev-node (yaml-pro-ts-prev-mapping-node tree-top "block_mapping_pair")))
+    (when prev-node
+      (goto-char (treesit-node-start prev-node)))))
+
+(defun yaml-pro-ts-next-subtree ()
+  "Move the point to the next subtree."
+  (interactive)
+  (let* ((at-node (treesit-node-at (point)))
+         (tree-top (yaml-pro-ts--until-mapping at-node))
+         (next-node (yaml-pro-ts-next-mapping-node tree-top "block_mapping_pair")))
+    (when next-node
+      (goto-char (treesit-node-start next-node)))))
+
+(defun yaml-pro-ts-move-subtree (dir)
+  "Get the current and DIR node and swap the contents of the two."
+  (interactive)
+  (let* ((at-node (treesit-node-at (point)))
+         (tree-top (yaml-pro-ts--until-mapping-or-list at-node))
+         (tree-top-type (treesit-node-type tree-top))
+         (sibling-node (if (eq dir 'down)
+                        (yaml-pro-ts-next-mapping-node tree-top tree-top-type)
+                      (yaml-pro-ts-prev-mapping-node tree-top tree-top-type)))
+         (at-start-marker (make-marker))
+         (at-end-marker (make-marker))
+         (sibling-start-marker (make-marker))
+         (sibling-end-marker (make-marker)))
+    (when (and tree-top sibling-node)
+      (set-marker at-start-marker (treesit-node-start tree-top))
+      (set-marker at-end-marker (treesit-node-end tree-top))
+      (set-marker sibling-start-marker (treesit-node-start sibling-node))
+      (set-marker sibling-end-marker (treesit-node-end sibling-node))
+      (let* ((at-tree-text (buffer-substring-no-properties
+                            at-start-marker at-end-marker))
+             (sibling-tree-text (buffer-substring-no-properties
+                                 sibling-start-marker sibling-end-marker)))
+        (delete-region at-start-marker at-end-marker)
+        (delete-region sibling-start-marker sibling-end-marker)
+        (goto-char sibling-start-marker)
+        (insert at-tree-text)
+        (goto-char at-start-marker)
+        (insert sibling-tree-text)
+        (goto-char sibling-start-marker)))))
+
+(defun yaml-pro-ts-move-subtree-up ()
+  "Swap the current tree with that of the next sibling's."
+  (interactive)
+  (yaml-pro-ts-move-subtree 'up))
+
+(defun yaml-pro-ts-move-subtree-down ()
+  "Swap the current tree with that of the previous sibling's."
+  (interactive)
+  (yaml-pro-ts-move-subtree 'down))
+
+(defun yaml-pro-ts-meta-return ()
+  "Insert new list item after current item."
+  (interactive)
+  (let* ((at-node (treesit-node-at (point)))
+         (list-item-top (yaml-pro-ts--until-mapping at-node)))
+    (when list-item-top
+      (let* ((indentation (save-excursion
+                            (goto-char (treesit-node-start list-item-top))
+                            (current-column))))
+        (goto-char (treesit-node-end list-item-top))
+        (insert "\n" (make-string indentation ?\s) "- ")))))
+
+(defun yaml-pro-convolute-tree ()
+  "Swap the keys of the parent of the item at point and the parent's parent."
+  (interactive)
+  (let* ((at-node (yaml-pro-ts--until-mapping (treesit-node-at (point))))
+         (parent-tree (yaml-pro-ts--until-mapping at-node))
+         (grandparent-tree (yaml-pro-ts--until-mapping
+                            (treesit-node-parent parent-tree))))
+    (when (and parent-tree grandparent-tree)
+      (let* ((query '((block_mapping_pair key: (_) @key)))
+             (parent-key (alist-get 'key (treesit-query-capture parent-tree query)))
+             (parent-start (treesit-node-start parent-key))
+             (parent-end (treesit-node-end parent-key))
+             (parent-text (buffer-substring-no-properties parent-start parent-end))
+             (grandparent-key (alist-get 'key (treesit-query-capture grandparent-tree query)))
+             (grandparent-start (treesit-node-start grandparent-key))
+             (grandparent-end (treesit-node-end grandparent-key))
+             (grandparent-text (buffer-substring-no-properties
+                                grandparent-start grandparent-end)))
+        (save-excursion
+          (delete-region parent-start parent-end)
+          (goto-char parent-start)
+          (insert grandparent-text)
+          (delete-region grandparent-start grandparent-end)
+          (goto-char grandparent-start)
+          (insert parent-text))))))
+
+(defun yaml-pro-ts-mark-subtree (up)
+   "Mark the current subtree.
+This puts point at the start of the current subtree, and mark at
+the end.  If a numeric prefix UP is given, move up into the
+hierarchy of headlines by UP levels before marking the subtree."
+   (interactive "P")
+   (while (and up (> up 0))
+     (yaml-pro-ts-up-level)
+     (cl-decf up))
+   (let* ((at-subtree (yaml-pro-ts--until-mapping-or-list (treesit-node-at (point)))))
+     (if (and (not up)
+              (or (and (eq last-command this-command) (mark t))
+                  (and transient-mark-mode mark-active)))
+         (progn
+           (while (and at-subtree (<= (treesit-node-end at-subtree) (mark)))
+             (setq at-subtree (yaml-pro-ts-next-mapping-node at-subtree (treesit-node-type at-subtree))))
+           (when at-subtree
+             (set-mark (treesit-node-end at-subtree))))
+       (push-mark (treesit-node-end at-subtree))
+       (goto-char (treesit-node-start at-subtree))
+       (activate-mark))))
+
+(defun yaml-pro-ts--imenu-node-label (node)
+  "Return an imenu label for NODE."
+  (let ((top node)
+        (root (treesit-buffer-root-node))
+        (label ""))
+    (while (not (treesit-node-eq node root))
+      (cond
+       ((equal (treesit-node-type node) "block_mapping_pair")
+        (let ((key-node (treesit-node-child-by-field-name node "key")))
+          (when key-node
+            (setq label (concat (treesit-node-text key-node)
+                                (if (equal label "") "" ".")
+                                label)))))
+       ((equal (treesit-node-type node) "block_sequence_item")
+        (setq label (format "[%d].%s" (treesit-node-index node) label))))
+      (setq node (treesit-node-parent node)))
+    label))
+
+(defun yaml-pro-ts-create-index ()
+  "Create imenu index of YAML file using treesitter."
+  (let ((all-keys (treesit-query-capture (treesit-buffer-root-node) '((block_mapping_pair key: (_) @key))))
+        (imenu-items '()))
+    (dolist (key-item all-keys)
+      (let* ((key-node (cdr key-item))
+             (key-label (yaml-pro-ts--imenu-node-label key-node)))
+        (push (cons key-label (treesit-node-start key-node)) imenu-items)))
+    (seq-reverse imenu-items)))
+
+(defun yaml-pro-ts-eldoc (&rest _ignored)
+  "Return eldoc message of current point."
+  (let* ((at-tree (yaml-pro-ts--until-mapping-or-list (treesit-node-at (point)))))
+    (when at-tree
+      (yaml-pro-ts--imenu-node-label at-tree))))
+
+(defconst yaml-pro-ts-mode-map
+  (let ((map (make-sparse-keymap)))
+    (prog1 map
+      (define-key map (kbd "C-c C-x C-w") #'yaml-pro-ts-kill-subtree)
+      (define-key map (kbd "C-c C-u") #'yaml-pro-ts-up-level)
+
+      (define-key map (kbd "C-c C-p") #'yaml-pro-ts-prev-subtree)
+      (define-key map (kbd "C-c C-n") #'yaml-pro-ts-next-subtree)
+
+      (define-key map (kbd "s-<up>") #'yaml-pro-ts-move-subtree-up)
+      (define-key map (kbd "s-<down>") #'yaml-pro-ts-move-subtree-down)
+
+      (define-key map (kbd "M-<return>") #'yaml-pro-ts-meta-return)
+      (define-key map (kbd "M-?") #'yaml-pro-convolute-tree)
+      (define-key map (kbd "C-c @") #'yaml-pro-ts-mark-subtree)
+
+      (define-key map (kbd "C-c '") #'yaml-pro-edit-ts-scalar)))
+  "Map for minor mode `yaml-pro-ts-mode'.")
+
+(define-minor-mode yaml-pro-ts-mode
+  "Minor mode to enable yaml-pro treesitter keymap.
+
+\\{yaml-pro-mode-map}"
+  :init-value nil
+  :group 'yaml-pro
+  :keymap yaml-pro-ts-mode-map
+  
+  (when yaml-pro-ts-mode
+    (unless (treesit-ready-p 'yaml)
+      (user-error "tree-sitter not ready for YAML"))
+    (treesit-parser-create 'yaml)
+    (setq imenu-generic-expression nil)
+    (setq imenu-create-index-function #'yaml-pro-ts-create-index)
+    (if (boundp 'eldoc-documentation-functions)
+        (add-hook 'eldoc-documentation-functions #'yaml-pro-ts-eldoc nil t)
+      (setq-local eldoc-documentation-function #'yaml-pro-ts-eldoc))))
+
+
+;;; yaml-pro parser
+
 (defcustom yaml-pro-max-parse-size 5000
   "Size of buffer for which any size greater than use heuristic to parse.
 
