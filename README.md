@@ -1,14 +1,34 @@
-# yaml-pro: tools for editing YAML leveraging a parser
+# yaml-pro: tools for editing YAML leveraging tree-sitter/parser
 
-yaml-pro is a package that provides conveniences for editing yaml.  It
-utilizes the YAML parser at https://github.com/zkry/yaml.el to obtain
-a parse tree and is then able to do things like move between subtrees,
-delete entire sections of YAML (even if it's written in JSON style),
-and swap subtrees.
+yaml-pro is a package that provides conveniences for editing yaml.
+This package has been written to leverage tree-sitters parsing
+facilities, allowing all of these actions to be performed fast and
+accurate.
 
-**NOTE: there is planned work for yaml-pro to be implemented with
-tree-sitter.  This should provide a huge speed increase to all of
-these actions.**
+
+# Tree-sitter support
+
+The latest version of yaml-pro contains tree-sitter support.  In order
+to use this you will need to have a version of Emacs installed that
+supports tree-sitter, as well as the yaml tree-sitter parser from
+here: https://github.com/ikatyang/tree-sitter-yaml . The tree-sitter
+re-implementation supports everything below, as well as the following:
+
+- **yaml-pro-ts-meta-return** (<kbd>M-<return></kbd>): Add a new list
+  item after the current item, similar to `org-meta-return`.
+- **yaml-pro-ts-convolute-tree** (<kbd>M-?</kbd>): Swap the key of the
+  current item's parent with that items parent.
+- **yaml-pro-ts-mark-subtree** (<kbd>C-c @</kbd>): Mark the current
+  YAML item.  If given a prefix N, mark the Nth parent above.  If
+  called repeatedly, mark subsequent items.
+- imenu: an index of all keys and their path are build for imenu
+- eldoc: current path is shown as eldoc documentation
+
+Note that folding is not implemented.  I assume some tree-sitter
+folding library will come along which will unify this feature.
+
+Note that all the below functions are infixed with "-ts-" to
+distinguish the tree-sitter and non-tree-sitter variants.
 
 # Demo
 
@@ -40,7 +60,39 @@ buffer and convert between the various styles with ease.
 
 ![indenting feature](./docs/indenting.gif)
 
-# Installation
+# Tree-sitter version
+
+To activate the mode, run `M-x yaml-pro-ts-mode`.
+
+
+In order to run the tree-sitter version of this program, you should
+have a version of Emacs that supports tree-sitter, as well as the yaml
+tree-sitter library installed
+(https://github.com/ikatyang/tree-sitter-yaml). Ex: having the file
+`libyaml.dylib` in `/usr/local/lib`.  With these in place,
+`(treesit-ready-p 'yaml)` should return `t`.
+
+## Usage
+
+- **yaml-pro-ts-kill-subtree** (<kbd>C-c</kbd> <kbd>C-x</kbd> <kbd>C-w</kbd>)
+- **yaml-pro-ts-up-level** (<kbd>C-c</kbd> <kbd>C-u</kbd>)
+- **yaml-pro-ts-next-subtree** (<kbd>C-c</kbd> <kbd>C-n</kbd>)
+- **yaml-pro-ts-prev-subtree** (<kbd>C-c</kbd> <kbd>C-p</kbd>)
+- **yaml-pro-ts-move-subtree-up** (<kbd>s-up</kbd>)
+- **yaml-pro-ts-move-subtree-down** (<kbd>s-down</kbd>)
+- **yaml-pro-ts-meta-return** (<kbd>M-<return></kbd>)
+- **yaml-pro-ts-convolute-tree** (<kbd>M-?</kbd>)
+- **yaml-pro-ts-mark-subtree** (<kbd>C-c @</kbd>)
+- **yaml-pro-edit-ts-scalar** (<kbd>C-c '</kbd>)
+  - (use prefix argument <kbd>C-u</kbd> to supply an initialization
+    command to set major mode)
+
+# Legacy Parser Version
+
+The following documentation is not applicable if you are using
+`yaml-pro-ts-mode` as your entry point.
+
+## Installation
 
 You can install this package with MELPA under the id
 `yaml-pro`. **IMPORTANT**: You have to have the latest version of
@@ -54,7 +106,7 @@ required version with the variable
 You can have yaml-pro-mode setup on yaml-mode loading with the
 configuration: `(add-hook 'yaml-mode-hook #'yaml-pro-mode)`
 
-# Usage
+## Usage
 
 Run the command `yaml-pro-mode` to initialize the mode. From there you
 have the following commands available (with default keybindings).
@@ -77,7 +129,7 @@ have the following commands available (with default keybindings).
 
 *The default bindings are subject to change as this package is in beta*
 
-# Configuration
+## Configuration
 
 Yaml.el, being an Emacs lisp parser, struggles with very large files.
 You can configure the parser to parse a smaller section of the buffer
@@ -97,17 +149,14 @@ such a heuristic is used.
   - [x] save default init command on a path basis
 - [x] Easy navigation (yaml-pro-jump)
 - [x] Partial tree-parsing for large files
-- [ ] Async parsing: preemptively parse document for faster editing
-      (perhaps via idle timer).
+- [x] Implement internally path-at-point.
+- [x] Move functionality to tree-sitter (for better error handling),
+      perhaps when tree-sitter in Emacs reaches some critical mass.
+- [ ] Common YAML mistakes linter
 - [ ] Tools to work with various template modes.  Go-templated YAML is
       very common but greatly hinders the effectiveness of tools like
       LSP.  Is there something that could be done (even if it's kind
       of hacky) to alleviate this?
-- [ ] Implement internally path-at-point. (?)
-- [ ] Move functionality to tree-sitter (for better error handling),
-      perhaps when tree-sitter in Emacs reaches some critical mass.
-- [ ] Common YAML mistakes linter
-- [ ] Difficult-to-handle syntax highlighting
 
 # Contributing
 
