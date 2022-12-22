@@ -1,17 +1,21 @@
 # yaml-pro: tools for editing YAML leveraging tree-sitter/parser
 
 yaml-pro is a package that provides conveniences for editing yaml.
-This package has been written to leverage tree-sitters parsing
+
+This package has been written to leverage **tree-sitter** parsing
 facilities, allowing all of these actions to be performed fast and
-accurate.
+accurate, even in the absence of parsing errors.  The tree-sitter
+version is **orders of magnitudes faster** and I highly recommend its
+usage if your Emacs version permits.
 
 
 # Tree-sitter support
 
-The latest version of yaml-pro contains tree-sitter support.  In order
-to use this you will need to have a version of Emacs installed that
-supports tree-sitter, as well as the yaml tree-sitter parser from
-here: https://github.com/ikatyang/tree-sitter-yaml . The tree-sitter
+The latest version of yaml-pro contains tree-sitter support (activated
+via `yaml-pro-ts-mode`).  In order to use this you will need to have a
+version of Emacs installed that supports tree-sitter, as well as the
+yaml tree-sitter parser from here:
+https://github.com/ikatyang/tree-sitter-yaml . The tree-sitter
 re-implementation supports everything below, as well as the following:
 
 - **yaml-pro-ts-meta-return** (<kbd>M-<return></kbd>): Add a new list
@@ -36,6 +40,14 @@ Note that all the functions are infixed with "-ts-" to distinguish the
 tree-sitter and non-tree-sitter variants.
 
 # Demo
+
+### Eldoc (tree-sitter)
+
+![eldoc](./docs/eldoc.gif)
+
+### Imenu (tree-sitter)
+
+![imenu](./docs/imenu.gif)
 
 ### Editing text in detached buffer
 

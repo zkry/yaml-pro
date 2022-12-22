@@ -40,7 +40,7 @@
   "Eeymap of yaml-edit-mode.")
 
 (defconst yaml-pro-edit-buffer-name "*yaml-pro-edit*")
-(defvar-local yaml-pro-ts-node-position nil)
+(defvar-local yaml-pro-edit-ts-node-position nil)
 (defvar-local yaml-pro-edit-scalar nil
   "The current scalar being edited on.
 Used to fetch location properties on completion.")
@@ -259,7 +259,7 @@ resulting in the function being ran upon subsequent edits."
           (setq edit-str (buffer-substring-no-properties (point-min) (point-max))))))
     (save-excursion
       (with-current-buffer yaml-pro-edit-parent-buffer
-        (let* ((pos (or yaml-pro-ts-node-position
+        (let* ((pos (or yaml-pro-edit-ts-node-position
                         (get-text-property 0 'yaml-position yaml-pro-edit-scalar)))
                (start (car pos))
                (end (cdr pos))
@@ -316,9 +316,9 @@ resulting in the function being ran upon subsequent edits."
 (declare-function yaml-pro--path-at-point "yaml-pro")
 (declare-function yaml-pro--use-fast-p "yaml-pro")
 
-(defun yaml-pro-edit-ts-scalar-node-at (pt)
-  ""
-  (let* ((at-node (treesit-node-at pt)))
+(defun yaml-pro-edit-ts-scalar-node-at (point)
+  "Return the node at POINT corresponding with editable scalar."
+  (let* ((at-node (treesit-node-at point)))
     (cond
      ((member (treesit-node-type at-node) '("block_scalar" "string_scalar"))
       at-node)
@@ -334,7 +334,10 @@ resulting in the function being ran upon subsequent edits."
       base-string)))
 
 (defun yaml-pro-edit-ts-scalar (p)
-  ""
+  "Edit the scalar value at the point in a separate buffer.
+This command utilizes tree-sitter to detirmine syntax
+locations.  If prefix argument P is provided, prompt user for
+initialization command."
   (interactive "p")
   (let* ((init-func)
          (parent-buffer (current-buffer))
@@ -346,7 +349,7 @@ resulting in the function being ran upon subsequent edits."
       (setq init-func (read-command "Initialization command: ")))
     (unless at-node
       (error "No scalar found at point"))
-    (setq yaml-pro-ts-node-position (cons start end))
+    (setq yaml-pro-edit-ts-node-position (cons start end))
     (save-excursion
       (goto-char (treesit-node-start at-node))
       (let* ((yaml-indentation (yaml-pro-edit--infer-indent end))

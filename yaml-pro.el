@@ -283,6 +283,7 @@ If REMOVE is non-nil, pop item off `kill-ring'."
                (insertion-string (with-temp-buffer
                                    (insert tree)
                                    (goto-char (point-min))
+                                   (forward-line 1)
                                    (while (not (eobp))
                                      (when (looking-at kill-indent-string)
                                        (delete-char kill-indent)
@@ -380,8 +381,10 @@ inserted to make the tree retain its original structure."
   :keymap yaml-pro-ts-mode-map
 
   (when yaml-pro-ts-mode
+    (unless (featurep 'treesit)
+      (user-error "Tree-sitter not supported in current Emacs version"))
     (unless (treesit-ready-p 'yaml)
-      (user-error "tree-sitter not ready for YAML"))
+      (user-error "YAML tree-sitter not ready"))
     (treesit-parser-create 'yaml)
     (setq imenu-generic-expression nil)
     (setq imenu-create-index-function #'yaml-pro-ts-create-index)
