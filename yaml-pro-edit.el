@@ -27,7 +27,7 @@
 
 ;;; Code:
 
-(require 'treesit)
+(require 'treesit nil t)
 (require 'yaml)
 
 (defconst yaml-pro-edit-mode-map

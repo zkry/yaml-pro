@@ -40,6 +40,7 @@
 
 (require 'yaml)
 (require 'yaml-pro-edit)
+(require 'treesit nil t)
 (require 'consult nil t)
 
 (defgroup yaml-pro nil
