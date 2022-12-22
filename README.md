@@ -21,14 +21,19 @@ re-implementation supports everything below, as well as the following:
 - **yaml-pro-ts-mark-subtree** (<kbd>C-c @</kbd>): Mark the current
   YAML item.  If given a prefix N, mark the Nth parent above.  If
   called repeatedly, mark subsequent items.
-- imenu: an index of all keys and their path are build for imenu
-- eldoc: current path is shown as eldoc documentation
+- **yaml-pro-ts-paste-subtree** (<kbd>C-c C-x C-y</kbd>): Paste a YAML
+  subtree, fixing indentation to be correct for different levels.
+  When `yaml-pro-ts-yank-subtrees` is non-nil, yank will automatically
+  call `yaml-pro-ts-paste-subtree` for subtrees.
+- **imenu**: an index of all keys and their path are build for imenu
+- **eldoc**: current path is shown as eldoc documentation. (enable
+  with `eldoc-mode`)
 
 Note that folding is not implemented.  I assume some tree-sitter
 folding library will come along which will unify this feature.
 
-Note that all the below functions are infixed with "-ts-" to
-distinguish the tree-sitter and non-tree-sitter variants.
+Note that all the functions are infixed with "-ts-" to distinguish the
+tree-sitter and non-tree-sitter variants.
 
 # Demo
 
@@ -82,8 +87,9 @@ tree-sitter library installed
 - **yaml-pro-ts-move-subtree-down** (<kbd>s-down</kbd>)
 - **yaml-pro-ts-meta-return** (<kbd>M-<return></kbd>)
 - **yaml-pro-ts-convolute-tree** (<kbd>M-?</kbd>)
-- **yaml-pro-ts-mark-subtree** (<kbd>C-c @</kbd>)
-- **yaml-pro-edit-ts-scalar** (<kbd>C-c '</kbd>)
+- **yaml-pro-ts-mark-subtree** (<kbd>C-c</kbd> <kbd>@</kbd>)
+- **yaml-pro-ts-paste-subtree** (<kbd>C-c</kbd> <kbd>C-x</kbd> <kbd>C-y</kbd>)
+- **yaml-pro-edit-ts-scalar** (<kbd>C-c</kbd> <kbd>'</kbd>)
   - (use prefix argument <kbd>C-u</kbd> to supply an initialization
     command to set major mode)
 

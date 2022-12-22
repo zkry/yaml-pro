@@ -50,12 +50,24 @@
 
 ;;; yaml-pro tree sitter
 
+(defcustom yaml-pro-ts-yank-subtrees t
+  "Non-nil means when yanking subtrees, adjust the level."
+  :group 'yaml-pro
+  :type 'boolean)
+
 (defun yaml-pro-ts--until-mapping (node)
   "Recursively look up from NODE returning first `block_mapping_pair'."
   (treesit-parent-until
    node
    (lambda (node)
      (equal (treesit-node-type node) "block_mapping_pair"))))
+
+(defun yaml-pro-ts--until-list (node)
+  "Recursively look up from NODE returning first `block_sequence_item'."
+  (treesit-parent-until
+   node
+   (lambda (node)
+     (equal (treesit-node-type node) "block_sequence_item"))))
 
 (defun yaml-pro-ts--until-mapping-or-list (node)
   "Recursively look up from NODE returning first mapping or sequence item."
@@ -166,7 +178,7 @@
   "Insert new list item after current item."
   (interactive)
   (let* ((at-node (treesit-node-at (point)))
-         (list-item-top (yaml-pro-ts--until-mapping at-node)))
+         (list-item-top (yaml-pro-ts--until-list at-node)))
     (when list-item-top
       (let* ((indentation (save-excursion
                             (goto-char (treesit-node-start list-item-top))
@@ -215,58 +227,80 @@ hierarchy of headlines by UP levels before marking the subtree."
                   (and transient-mark-mode mark-active)))
          (progn
            (while (and at-subtree (<= (treesit-node-end at-subtree) (mark)))
-             (setq at-subtree (yaml-pro-ts-next-mapping-node at-subtree (treesit-node-type at-subtree))))
+             (setq at-subtree
+                   (yaml-pro-ts-next-mapping-node
+                    at-subtree (treesit-node-type at-subtree))))
            (when at-subtree
              (set-mark (treesit-node-end at-subtree))))
        (push-mark (treesit-node-end at-subtree))
        (goto-char (treesit-node-start at-subtree))
        (activate-mark))))
 
-(defun yaml-pro-ts--kill-is-subtree ()
-  ""
+(defun yaml-pro-ts--kill-is-subtree (&optional tree)
+  "Return non-nil if TREE (or current kill) is a valid tree."
+  (unless tree
+    (setq tree (current-kill 0)))
   (let* ((kill (and kill-ring (current-kill 0))))
-    (when kill
+    (when (and kill (> (length (string-split kill "\n")) 1))
       (let ((node (treesit-parse-string kill 'yaml)))
         (treesit-query-capture node '((block_mapping_pair) @key))))))
 
-(defun yaml-pro-ts--paste-subtree ()
-  (let* ((tree (current-kill 0))
-         (base-indent (current-column))
-         (indent-lengths (save-match-data
-                           (seq-map
-                            (lambda (line)
-                              (string-match "^\\( *\\)" line)
-                              (length (match-string 1 line)))
-                            (seq-filter
-                             (lambda (line)
-                               (string-match-p "^ *[a-zA-Z0-9\"'_-]+:" line))
-                             (cdr (split-string tree "\n"))))))
-         ;; does the killed text have more than one top level?
-         ;; if so we need to calculate indentation differently.
-         (single-top-lvl-p
-          (seq-every-p
-           (lambda (len)
-             (<= (car indent-lengths) len))
-           (cdr indent-lengths)))
-         ;; indent that the rest of kill text should have
-         (kill-indent (+ (apply #'min indent-lengths)
-                         (if single-top-lvl-p -2 0)))
-         (kill-indent-string (make-string kill-indent ?\s))
-         (base-indent-string (make-string base-indent ?\s))
-         (insertion-string (with-temp-buffer
-                             (insert tree)
-                             (goto-char (point-min))
-                             (while (not (eobp))
-                               (when (looking-at kill-indent-string)
-                                 (delete-char kill-indent)
-                                 (insert base-indent-string))
-                               (forward-line 1))
-                             (buffer-string))))
-    (insert insertion-string)))
+(defun yaml-pro-ts-paste-subtree (&optional remove)
+  "Insert the current kill into the buffer, preserving tree structure.
+If REMOVE is non-nil, pop item off `kill-ring'."
+  (interactive)
+  (let ((tree (current-kill 0)))
+    (unless (yaml-pro-ts--kill-is-subtree tree)
+      (user-error
+       (substitute-command-keys
+        "The kill is not a YAML-tree. Use `\\[yank]' to yank anyways")))
+    (let* ((base-indent (current-column))
+           (indent-lengths (save-match-data
+                             (seq-map
+                              (lambda (line)
+                                (string-match "^\\( *\\)" line)
+                                (length (match-string 1 line)))
+                              (seq-filter
+                               (lambda (line)
+                                 (string-match-p "^ *[a-zA-Z0-9\"'_-]+:" line))
+                               (cdr (split-string tree "\n")))))))
+      (if (not indent-lengths)
+          (progn
+            (push-mark (point) 'nomsg)
+            (insert tree))
+        (let* (;; does the killed text have more than one top level?
+               ;; if so we need to calculate indentation differently.
+               (single-top-lvl-p
+                (seq-every-p
+                 (lambda (len)
+                   (<= (car indent-lengths) len))
+                 (cdr indent-lengths)))
+               ;; indent that the rest of kill text should have
+               (kill-indent (+ (apply #'min indent-lengths)
+                               (if single-top-lvl-p -2 0)))
+               (kill-indent-string (make-string kill-indent ?\s))
+               (base-indent-string (make-string base-indent ?\s))
+               (insertion-string (with-temp-buffer
+                                   (insert tree)
+                                   (goto-char (point-min))
+                                   (while (not (eobp))
+                                     (when (looking-at kill-indent-string)
+                                       (delete-char kill-indent)
+                                       (insert base-indent-string))
+                                     (forward-line 1))
+                                   (buffer-string))))
+          (push-mark (point) 'nomsg)
+          (insert insertion-string)))))
+  (when remove (pop kill-ring)))
 
 (defun yaml-pro-ts-yank (&optional arg)
-  ""
+  "Yank text on kill ring.  If YAML-subtree, then indent it correctly.
+This command will look at the current kill and check if it is a
+subtree, or series of subtrees.  If so, and ARG is nil, the
+subtree is yanked with the appropriate amount of whitespace
+inserted to make the tree retain its original structure."
   (interactive "P")
+  (setq this-command 'yank)
   (if arg
       (call-interactively #'yank)
     (let ((subtreep
@@ -277,8 +311,8 @@ hierarchy of headlines by UP levels before marking the subtree."
                           "\\` +\\'"
                           (buffer-substring (point-at-bol) (point))))))))
       (cond
-       (subtreep
-        (yaml-pro-ts--paste-subtree))
+       ((and subtreep yaml-pro-ts-yank-subtrees)
+        (yaml-pro-ts-paste-subtree))
        (t (call-interactively #'yank))))))
 
 (defun yaml-pro-ts--imenu-node-label (node)
@@ -330,6 +364,7 @@ hierarchy of headlines by UP levels before marking the subtree."
       (define-key map (kbd "M-<return>") #'yaml-pro-ts-meta-return)
       (define-key map (kbd "M-?") #'yaml-pro-convolute-tree)
       (define-key map (kbd "C-c @") #'yaml-pro-ts-mark-subtree)
+      (define-key map (kbd "C-c C-x C-y") #'yaml-pro-ts-paste-subtree)
 
       (define-key map [remap yank] #'yaml-pro-ts-yank)
 
