@@ -1,5 +1,7 @@
 # yaml-pro: tools for editing YAML leveraging tree-sitter/parser
 
+[![MELPA](https://melpa.org/packages/yaml-pro-badge.svg)](https://melpa.org/#/yaml-pro)
+
 yaml-pro is a package that provides conveniences for editing yaml.
 
 This package has been written to leverage **tree-sitter** parsing
