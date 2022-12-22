@@ -49,6 +49,10 @@ tree-sitter and non-tree-sitter variants.
 
 ![imenu](./docs/imenu.gif)
 
+### Subtree pasting (tree-sitter)
+
+![screenshot](./docs/subtree-paste.gif)
+
 ### Editing text in detached buffer
 
 ![screenshot](./docs/screenshot1.gif)
