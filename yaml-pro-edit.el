@@ -27,6 +27,9 @@
 
 ;;; Code:
 
+(require 'treesit)
+(require 'yaml)
+
 (defconst yaml-pro-edit-mode-map
   (let ((map (make-sparse-keymap)))
     (prog1 map
@@ -37,6 +40,7 @@
   "Eeymap of yaml-edit-mode.")
 
 (defconst yaml-pro-edit-buffer-name "*yaml-pro-edit*")
+(defvar-local yaml-pro-edit-ts-node-position nil)
 (defvar-local yaml-pro-edit-scalar nil
   "The current scalar being edited on.
 Used to fetch location properties on completion.")
@@ -81,11 +85,12 @@ Used to fetch location properties on completion.")
 
 (defun yaml-pro-edit--infer-indent (&optional pos)
   "Infer the YAML indentation of POS or the current point."
-  (let ((pos (or pos (point))))
-    (goto-char pos)
-    (forward-line 0)
-    (skip-chars-forward "- \n")
-    (current-column)))
+  (save-excursion
+    (let ((pos (or pos (point))))
+      (goto-char pos)
+      (forward-line 0)
+      (skip-chars-forward "- \n")
+      (current-column))))
 
 (defconst yaml-pro-edit-output-types
   '(("|" . literal)
@@ -254,7 +259,8 @@ resulting in the function being ran upon subsequent edits."
           (setq edit-str (buffer-substring-no-properties (point-min) (point-max))))))
     (save-excursion
       (with-current-buffer yaml-pro-edit-parent-buffer
-        (let* ((pos (get-text-property 0 'yaml-position yaml-pro-edit-scalar))
+        (let* ((pos (or yaml-pro-edit-ts-node-position
+                        (get-text-property 0 'yaml-position yaml-pro-edit-scalar)))
                (start (car pos))
                (end (cdr pos))
                (indent (yaml-pro-edit--infer-indent start))
@@ -309,6 +315,80 @@ resulting in the function being ran upon subsequent edits."
 (declare-function yaml-pro--fast-value-at-point "yaml-pro")
 (declare-function yaml-pro--path-at-point "yaml-pro")
 (declare-function yaml-pro--use-fast-p "yaml-pro")
+
+(defun yaml-pro-edit-ts-scalar-node-at (point)
+  "Return the node at POINT corresponding with editable scalar."
+  (let* ((at-node (treesit-node-at point)))
+    (cond
+     ((member (treesit-node-type at-node) '("block_scalar" "string_scalar"))
+      at-node)
+     ((member (treesit-node-type at-node) '("'" "\"" "escape_sequence"))
+      (treesit-node-parent at-node)))))
+
+(defun yaml-pro-edit-ts-strip-quotes (text)
+  "Strip the first and last quote character in TEXT."
+  (let ((is-single-quote (eql (aref text 0) ?'))
+        (base-string (substring text 1 (1- (length text)))))
+    (if is-single-quote
+        (replace-regexp-in-string " *\n+ *" " " base-string)
+      base-string)))
+
+(defun yaml-pro-edit-ts-scalar (p)
+  "Edit the scalar value at the point in a separate buffer.
+This command utilizes tree-sitter to detirmine syntax
+locations.  If prefix argument P is provided, prompt user for
+initialization command."
+  (interactive "p")
+  (let* ((init-func)
+         (parent-buffer (current-buffer))
+         (at-node (yaml-pro-edit-ts-scalar-node-at (point)))
+         (start (treesit-node-start at-node))
+         (end (treesit-node-end at-node))
+         (node-text (treesit-node-text at-node)))
+    (when (= 4 p)
+      (setq init-func (read-command "Initialization command: ")))
+    (unless at-node
+      (error "No scalar found at point"))
+    (setq yaml-pro-edit-ts-node-position (cons start end))
+    (save-excursion
+      (goto-char (treesit-node-start at-node))
+      (let* ((yaml-indentation (yaml-pro-edit--infer-indent end))
+             (folded-block-p (looking-at-p ">"))
+             (literal-block-p (looking-at-p "|"))
+             (strip-p (looking-at-p ".-[0-9]*\n"))
+             (keep-p (looking-at-p ".+[0-9]*\n"))
+             (double-quote-string-p (equal "double_quote_scalar" (treesit-node-type at-node)))
+             (single-quote-string-p (equal "single_quote_scalar" (treesit-node-type at-node)))
+             (type (cond ((and folded-block-p strip-p) 'folded-strip)
+                         ((and literal-block-p strip-p) 'literal-strip)
+                         ((and folded-block-p keep-p) 'folded-keep)
+                         ((and literal-block-p keep-p) 'literal-keep)
+                         (folded-block-p 'folded)
+                         (literal-block-p 'literal)
+                         (single-quote-string-p 'single)
+                         (double-quote-string-p 'double))))
+        (when yaml-pro-edit-scalar-overlay
+          (delete-overlay yaml-pro-edit-scalar-overlay))
+        (let ((ov (make-overlay start end))
+              (read-only
+               (list
+                (lambda (&rest _) (user-error "Can't modify a scalar being edited in a dedicated buffer")))))
+          (overlay-put ov 'modification-hooks read-only)
+          (overlay-put ov 'insert-in-front-hooks read-only)
+          (overlay-put ov 'insert-behind-hooks read-only)
+          (overlay-put ov 'face 'secondary-selection)
+          (setq yaml-pro-edit-scalar-overlay ov))
+        (let ((b (get-buffer-create yaml-pro-edit-buffer-name)))
+          (if (or folded-block-p literal-block-p)
+              (yaml-pro-edit-initialize-buffer
+               parent-buffer b (yaml-pro-edit--extract-scalar-text node-text yaml-indentation) type init-func nil)
+            (yaml-pro-edit-initialize-buffer
+             parent-buffer b (yaml-parse-string node-text) type init-func nil))
+          (switch-to-buffer-other-window b))))))
+
+(ignore-errors
+  (when (= a b)
+    (setq a (1+ a))))
 
 ;;;###autoload
 (defun yaml-pro-edit-scalar (p)

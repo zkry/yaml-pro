@@ -47,6 +47,401 @@
   :prefix "yaml-pro-"
   :group 'convenience)
 
+
+;;; yaml-pro tree sitter
+
+(defcustom yaml-pro-ts-yank-subtrees t
+  "Non-nil means when yanking subtrees, adjust the level."
+  :group 'yaml-pro
+  :type 'boolean)
+
+(defun yaml-pro-ts--until-mapping (node)
+  "Recursively look up from NODE returning first `block_mapping_pair'."
+  (treesit-parent-until
+   node
+   (lambda (node)
+     (equal (treesit-node-type node) "block_mapping_pair"))))
+
+(defun yaml-pro-ts--until-list (node)
+  "Recursively look up from NODE returning first `block_sequence_item'."
+  (treesit-parent-until
+   node
+   (lambda (node)
+     (equal (treesit-node-type node) "block_sequence_item"))))
+
+(defun yaml-pro-ts--until-mapping-or-list (node)
+  "Recursively look up from NODE returning first mapping or sequence item."
+  (treesit-parent-until
+   node
+   (lambda (node)
+     (or
+      (equal (treesit-node-type node) "block_mapping_pair")
+      (equal (treesit-node-type node) "block_sequence_item")))))
+
+(defun yaml-pro-ts-kill-subtree ()
+  "Kill the entire subtree located at the current-point."
+  (interactive)
+  (let* ((at-node (treesit-node-at (point)))
+         (tree-top (yaml-pro-ts--until-mapping at-node)))
+    (when tree-top
+      (kill-region (treesit-node-start tree-top)
+                   (treesit-node-end tree-top)))))
+
+(defun yaml-pro-ts-up-level ()
+  "Move the point to the parent tree."
+  (interactive)
+  (let* ((at-node (treesit-node-at (point)))
+         (tree-top (yaml-pro-ts--until-mapping at-node))
+         (parent-tree-top (and tree-top (yaml-pro-ts--until-mapping tree-top))))
+    (when parent-tree-top
+      (goto-char (treesit-node-start parent-tree-top)))))
+
+
+(defun yaml-pro-ts-prev-mapping-node (tree-top type)
+  "Return nearest previous sibling node of TREE-TOP of type TYPE."
+  (interactive)
+  (setq tree-top (treesit-node-prev-sibling tree-top))
+  (while (and tree-top
+              (not (equal (treesit-node-type tree-top) type)))
+    (setq tree-top (treesit-node-prev-sibling tree-top)))
+  tree-top)
+
+(defun yaml-pro-ts-next-mapping-node (tree-top type)
+  "Return nearest next sibling node of TREE-TOP of type TYPE."
+  (interactive)
+  (setq tree-top (treesit-node-next-sibling tree-top))
+  (while (and tree-top
+              (not (equal (treesit-node-type tree-top) type)))
+    (setq tree-top (treesit-node-next-sibling tree-top)))
+  tree-top)
+
+
+(defun yaml-pro-ts-prev-subtree ()
+  "Move the point to the previous subtree."
+  (interactive)
+  (let* ((at-node (treesit-node-at (point)))
+         (tree-top (yaml-pro-ts--until-mapping at-node))
+         (prev-node (yaml-pro-ts-prev-mapping-node tree-top "block_mapping_pair")))
+    (when prev-node
+      (goto-char (treesit-node-start prev-node)))))
+
+(defun yaml-pro-ts-next-subtree ()
+  "Move the point to the next subtree."
+  (interactive)
+  (let* ((at-node (treesit-node-at (point)))
+         (tree-top (yaml-pro-ts--until-mapping at-node))
+         (next-node (yaml-pro-ts-next-mapping-node tree-top "block_mapping_pair")))
+    (when next-node
+      (goto-char (treesit-node-start next-node)))))
+
+(defun yaml-pro-ts-move-subtree (dir)
+  "Get the current and DIR node and swap the contents of the two."
+  (interactive)
+  (let* ((at-node (treesit-node-at (point)))
+         (tree-top (yaml-pro-ts--until-mapping-or-list at-node))
+         (tree-top-type (treesit-node-type tree-top))
+         (sibling-node (if (eq dir 'down)
+                        (yaml-pro-ts-next-mapping-node tree-top tree-top-type)
+                      (yaml-pro-ts-prev-mapping-node tree-top tree-top-type)))
+         (at-start-marker (make-marker))
+         (at-end-marker (make-marker))
+         (sibling-start-marker (make-marker))
+         (sibling-end-marker (make-marker)))
+    (when (and tree-top sibling-node)
+      (set-marker at-start-marker (treesit-node-start tree-top))
+      (set-marker at-end-marker (treesit-node-end tree-top))
+      (set-marker sibling-start-marker (treesit-node-start sibling-node))
+      (set-marker sibling-end-marker (treesit-node-end sibling-node))
+      (let* ((at-tree-text (buffer-substring-no-properties
+                            at-start-marker at-end-marker))
+             (sibling-tree-text (buffer-substring-no-properties
+                                 sibling-start-marker sibling-end-marker)))
+        (delete-region at-start-marker at-end-marker)
+        (delete-region sibling-start-marker sibling-end-marker)
+        (goto-char sibling-start-marker)
+        (insert at-tree-text)
+        (goto-char at-start-marker)
+        (insert sibling-tree-text)
+        (goto-char sibling-start-marker)))))
+
+(defun yaml-pro-ts-move-subtree-up ()
+  "Swap the current tree with that of the next sibling's."
+  (interactive)
+  (yaml-pro-ts-move-subtree 'up))
+
+(defun yaml-pro-ts-move-subtree-down ()
+  "Swap the current tree with that of the previous sibling's."
+  (interactive)
+  (yaml-pro-ts-move-subtree 'down))
+
+(defun yaml-pro-ts-meta-return ()
+  "Insert new list item after current item."
+  (interactive)
+  (let* ((at-node (treesit-node-at (point)))
+         (list-item-top (yaml-pro-ts--until-list at-node)))
+    (when list-item-top
+      (let* ((indentation (save-excursion
+                            (goto-char (treesit-node-start list-item-top))
+                            (current-column))))
+        (goto-char (treesit-node-end list-item-top))
+        (insert "\n" (make-string indentation ?\s) "- ")))))
+
+(defun yaml-pro-convolute-tree ()
+  "Swap the keys of the parent of the item at point and the parent's parent."
+  (interactive)
+  (let* ((at-node (yaml-pro-ts--until-mapping (treesit-node-at (point))))
+         (parent-tree (yaml-pro-ts--until-mapping at-node))
+         (grandparent-tree (yaml-pro-ts--until-mapping
+                            (treesit-node-parent parent-tree))))
+    (when (and parent-tree grandparent-tree)
+      (let* ((query '((block_mapping_pair key: (_) @key)))
+             (parent-key (alist-get 'key (treesit-query-capture parent-tree query)))
+             (parent-start (treesit-node-start parent-key))
+             (parent-end (treesit-node-end parent-key))
+             (parent-text (buffer-substring-no-properties parent-start parent-end))
+             (grandparent-key (alist-get 'key (treesit-query-capture grandparent-tree query)))
+             (grandparent-start (treesit-node-start grandparent-key))
+             (grandparent-end (treesit-node-end grandparent-key))
+             (grandparent-text (buffer-substring-no-properties
+                                grandparent-start grandparent-end)))
+        (save-excursion
+          (delete-region parent-start parent-end)
+          (goto-char parent-start)
+          (insert grandparent-text)
+          (delete-region grandparent-start grandparent-end)
+          (goto-char grandparent-start)
+          (insert parent-text))))))
+
+(defun yaml-pro-ts-indent-subtree ()
+  "Indent the current subtree by one level.
+
+This function uses tree-sitter.  Indentation is controlled by the
+variable `yaml-pro-indent'."
+  (interactive)
+  (let ((at-subtree (yaml-pro-ts--until-mapping (treesit-node-at (point))))
+        (origin-marker (make-marker))
+        (end-marker (make-marker))
+        (indent-str (make-string yaml-pro-indent ?\s)))
+    (set-marker origin-marker (point))
+    (set-marker end-marker (treesit-node-end at-subtree))
+    (goto-char (treesit-node-start at-subtree))
+    (forward-line 0)
+    (while (< (point) end-marker)
+      (when (not (looking-at " *$"))
+        (insert indent-str))
+      (forward-line 1))
+    (goto-char origin-marker)
+    (set-marker origin-marker nil)
+    (set-marker end-marker nil)))
+
+(defun yaml-pro-ts-unindent-subtree ()
+  "Unindent the current subtree by one level.
+
+This function uses tree-sitter.  Indentation is controlled by the
+variable `yaml-pro-indent'."
+  (interactive)
+  (let ((at-subtree (yaml-pro-ts--until-mapping (treesit-node-at (point))))
+        (origin-marker (make-marker))
+        (end-marker (make-marker))
+        (indent-str (make-string yaml-pro-indent ?\s)))
+    (set-marker origin-marker (point))
+    (set-marker end-marker (treesit-node-end at-subtree))
+    (goto-char (treesit-node-start at-subtree))
+    (forward-line 0)
+    (while (< (point) end-marker)
+      (when (looking-at (regexp-quote indent-str))
+        (delete-char yaml-pro-indent))
+      (forward-line 1))
+    (goto-char origin-marker)
+    (set-marker origin-marker nil)
+    (set-marker end-marker nil)))
+
+(defun yaml-pro-ts-mark-subtree (up)
+   "Mark the current subtree.
+This puts point at the start of the current subtree, and mark at
+the end.  If a numeric prefix UP is given, move up into the
+hierarchy of headlines by UP levels before marking the subtree."
+   (interactive "P")
+   (while (and up (> up 0))
+     (yaml-pro-ts-up-level)
+     (cl-decf up))
+   (let* ((at-subtree (yaml-pro-ts--until-mapping-or-list (treesit-node-at (point)))))
+     (if (and (not up)
+              (or (and (eq last-command this-command) (mark t))
+                  (and transient-mark-mode mark-active)))
+         (progn
+           (while (and at-subtree (<= (treesit-node-end at-subtree) (mark)))
+             (setq at-subtree
+                   (yaml-pro-ts-next-mapping-node
+                    at-subtree (treesit-node-type at-subtree))))
+           (when at-subtree
+             (set-mark (treesit-node-end at-subtree))))
+       (push-mark (treesit-node-end at-subtree))
+       (goto-char (treesit-node-start at-subtree))
+       (activate-mark))))
+
+(defun yaml-pro-ts--kill-is-subtree (&optional tree)
+  "Return non-nil if TREE (or current kill) is a valid tree."
+  (unless tree
+    (setq tree (current-kill 0)))
+  (let* ((kill (and kill-ring (current-kill 0))))
+    (when (and kill (> (length (string-split kill "\n")) 1))
+      (let ((node (treesit-parse-string kill 'yaml)))
+        (treesit-query-capture node '((block_mapping_pair) @key))))))
+
+(defun yaml-pro-ts-paste-subtree (&optional remove)
+  "Insert the current kill into the buffer, preserving tree structure.
+If REMOVE is non-nil, pop item off `kill-ring'."
+  (interactive)
+  (let ((tree (current-kill 0)))
+    (unless (yaml-pro-ts--kill-is-subtree tree)
+      (user-error
+       (substitute-command-keys
+        "The kill is not a YAML-tree. Use `\\[yank]' to yank anyways")))
+    (let* ((base-indent (current-column))
+           (indent-lengths (save-match-data
+                             (seq-map
+                              (lambda (line)
+                                (string-match "^\\( *\\)" line)
+                                (length (match-string 1 line)))
+                              (seq-filter
+                               (lambda (line)
+                                 (string-match-p "^ *[a-zA-Z0-9\"'_-]+:" line))
+                               (cdr (split-string tree "\n")))))))
+      (if (not indent-lengths)
+          (progn
+            (push-mark (point) 'nomsg)
+            (insert tree))
+        (let* (;; does the killed text have more than one top level?
+               ;; if so we need to calculate indentation differently.
+               (single-top-lvl-p
+                (seq-every-p
+                 (lambda (len)
+                   (<= (car indent-lengths) len))
+                 (cdr indent-lengths)))
+               ;; indent that the rest of kill text should have
+               (kill-indent (+ (apply #'min indent-lengths)
+                               (if single-top-lvl-p -2 0)))
+               (kill-indent-string (make-string kill-indent ?\s))
+               (base-indent-string (make-string base-indent ?\s))
+               (insertion-string (with-temp-buffer
+                                   (insert tree)
+                                   (goto-char (point-min))
+                                   (forward-line 1)
+                                   (while (not (eobp))
+                                     (when (looking-at kill-indent-string)
+                                       (delete-char kill-indent)
+                                       (insert base-indent-string))
+                                     (forward-line 1))
+                                   (buffer-string))))
+          (push-mark (point) 'nomsg)
+          (insert insertion-string)))))
+  (when remove (pop kill-ring)))
+
+(defun yaml-pro-ts-yank (&optional arg)
+  "Yank text on kill ring.  If YAML-subtree, then indent it correctly.
+This command will look at the current kill and check if it is a
+subtree, or series of subtrees.  If so, and ARG is nil, the
+subtree is yanked with the appropriate amount of whitespace
+inserted to make the tree retain its original structure."
+  (interactive "P")
+  (setq this-command 'yank)
+  (if arg
+      (call-interactively #'yank)
+    (let ((subtreep
+           (and (yaml-pro-ts--kill-is-subtree)
+                (or (bolp)
+                    (and (looking-at "[ \t]*$")
+                         (string-match
+                          "\\` +\\'"
+                          (buffer-substring (point-at-bol) (point))))))))
+      (cond
+       ((and subtreep yaml-pro-ts-yank-subtrees)
+        (yaml-pro-ts-paste-subtree))
+       (t (call-interactively #'yank))))))
+
+(defun yaml-pro-ts--imenu-node-label (node)
+  "Return an imenu label for NODE."
+  (let ((top node)
+        (root (treesit-buffer-root-node))
+        (label ""))
+    (while (not (treesit-node-eq node root))
+      (cond
+       ((equal (treesit-node-type node) "block_mapping_pair")
+        (let ((key-node (treesit-node-child-by-field-name node "key")))
+          (when key-node
+            (setq label (concat (treesit-node-text key-node)
+                                (if (equal label "") "" ".")
+                                label)))))
+       ((equal (treesit-node-type node) "block_sequence_item")
+        (setq label (format "[%d].%s" (treesit-node-index node) label))))
+      (setq node (treesit-node-parent node)))
+    label))
+
+(defun yaml-pro-ts-create-index ()
+  "Create imenu index of YAML file using treesitter."
+  (let ((all-keys (treesit-query-capture (treesit-buffer-root-node) '((block_mapping_pair key: (_) @key))))
+        (imenu-items '()))
+    (dolist (key-item all-keys)
+      (let* ((key-node (cdr key-item))
+             (key-label (yaml-pro-ts--imenu-node-label key-node)))
+        (push (cons key-label (treesit-node-start key-node)) imenu-items)))
+    (seq-reverse imenu-items)))
+
+(defun yaml-pro-ts-eldoc (&rest _ignored)
+  "Return eldoc message of current point."
+  (let* ((at-tree (yaml-pro-ts--until-mapping-or-list (treesit-node-at (point)))))
+    (when at-tree
+      (yaml-pro-ts--imenu-node-label at-tree))))
+
+(defconst yaml-pro-ts-mode-map
+  (let ((map (make-sparse-keymap)))
+    (prog1 map
+      (define-key map (kbd "C-c C-x C-w") #'yaml-pro-ts-kill-subtree)
+      (define-key map (kbd "C-c C-u") #'yaml-pro-ts-up-level)
+
+      (define-key map (kbd "C-c C-p") #'yaml-pro-ts-prev-subtree)
+      (define-key map (kbd "C-c C-n") #'yaml-pro-ts-next-subtree)
+
+      (define-key map (kbd "s-<up>") #'yaml-pro-ts-move-subtree-up)
+      (define-key map (kbd "s-<down>") #'yaml-pro-ts-move-subtree-down)
+
+      (define-key map (kbd "C-c >") #'yaml-pro-ts-indent-subtree)
+      (define-key map (kbd "C-c <") #'yaml-pro-ts-unindent-subtree)
+
+      (define-key map (kbd "M-<return>") #'yaml-pro-ts-meta-return)
+      (define-key map (kbd "M-?") #'yaml-pro-convolute-tree)
+      (define-key map (kbd "C-c @") #'yaml-pro-ts-mark-subtree)
+      (define-key map (kbd "C-c C-x C-y") #'yaml-pro-ts-paste-subtree)
+
+      (define-key map [remap yank] #'yaml-pro-ts-yank)
+
+      (define-key map (kbd "C-c '") #'yaml-pro-edit-ts-scalar)))
+  "Map for minor mode `yaml-pro-ts-mode'.")
+
+(define-minor-mode yaml-pro-ts-mode
+  "Minor mode to enable yaml-pro treesitter keymap.
+
+\\{yaml-pro-mode-map}"
+  :init-value nil
+  :group 'yaml-pro
+  :keymap yaml-pro-ts-mode-map
+
+  (when yaml-pro-ts-mode
+    (unless (featurep 'treesit)
+      (user-error "Tree-sitter not supported in current Emacs version"))
+    (unless (treesit-ready-p 'yaml)
+      (user-error "YAML tree-sitter not ready"))
+    (treesit-parser-create 'yaml)
+    (setq imenu-generic-expression nil)
+    (setq imenu-create-index-function #'yaml-pro-ts-create-index)
+    (if (boundp 'eldoc-documentation-functions)
+        (add-hook 'eldoc-documentation-functions #'yaml-pro-ts-eldoc nil t)
+      (setq-local eldoc-documentation-function #'yaml-pro-ts-eldoc))))
+
+
+;;; yaml-pro parser
+
 (defcustom yaml-pro-max-parse-size 5000
   "Size of buffer for which any size greater than use heuristic to parse.
 
