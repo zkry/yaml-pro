@@ -18,7 +18,7 @@ yaml tree-sitter parser from here:
 https://github.com/ikatyang/tree-sitter-yaml . The tree-sitter
 re-implementation supports everything below, as well as the following:
 
-- **yaml-pro-ts-meta-return** (<kbd>M-<return></kbd>): Add a new list
+- **yaml-pro-ts-meta-return** (<kbd>M-return</kbd>): Add a new list
   item after the current item, similar to `org-meta-return`.
 - **yaml-pro-ts-convolute-tree** (<kbd>M-?</kbd>): Swap the key of the
   current item's parent with that items parent.
@@ -57,17 +57,22 @@ Never have to consult https://yaml-multiline.info/ again!  With
 `yaml-pro-edit-scalar`, you can edit a scalar value in a detached
 buffer and convert between the various styles with ease.
 
-### Jump to heading (with consult support)
+### Jump to heading (legacy parser)
 
 ![jumping feature](./docs/yaml-pro-jump.gif)
+
+If using tree-sitter variant, you should be able to just use imenu.
 
 ### Moving subtrees up and down
 
 ![moving subtrees feature](./docs/move-subtree.gif)
 
-### Folding subtrees
+### Folding subtrees (legacy parser)
 
 ![folding feature](./docs/folding.gif)
+
+This is not available for tree-sitter variant.  Presumably some
+tree-sitter folding package will exist in the future.
 
 ### Killing subtrees
 
@@ -99,6 +104,8 @@ tree-sitter library installed
 - **yaml-pro-ts-move-subtree-down** (<kbd>s-down</kbd>)
 - **yaml-pro-ts-meta-return** (<kbd>M-<return></kbd>)
 - **yaml-pro-ts-convolute-tree** (<kbd>M-?</kbd>)
+- **yaml-pro-ts-indent-subtree** (<kbd>C-c</kbd> <kbd>></kbd>)
+- **yaml-pro-ts-unindent-subtree** (<kbd>C-c</kbd> <kbd><</kbd>)
 - **yaml-pro-ts-mark-subtree** (<kbd>C-c</kbd> <kbd>@</kbd>)
 - **yaml-pro-ts-paste-subtree** (<kbd>C-c</kbd> <kbd>C-x</kbd> <kbd>C-y</kbd>)
 - **yaml-pro-edit-ts-scalar** (<kbd>C-c</kbd> <kbd>'</kbd>)

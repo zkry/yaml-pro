@@ -212,6 +212,50 @@
           (goto-char grandparent-start)
           (insert parent-text))))))
 
+(defun yaml-pro-ts-indent-subtree ()
+  "Indent the current subtree by one level.
+
+This function uses tree-sitter.  Indentation is controlled by the
+variable `yaml-pro-indent'."
+  (interactive)
+  (let ((at-subtree (yaml-pro-ts--until-mapping (treesit-node-at (point))))
+        (origin-marker (make-marker))
+        (end-marker (make-marker))
+        (indent-str (make-string yaml-pro-indent ?\s)))
+    (set-marker origin-marker (point))
+    (set-marker end-marker (treesit-node-end at-subtree))
+    (goto-char (treesit-node-start at-subtree))
+    (forward-line 0)
+    (while (< (point) end-marker)
+      (when (not (looking-at " *$"))
+        (insert indent-str))
+      (forward-line 1))
+    (goto-char origin-marker)
+    (set-marker origin-marker nil)
+    (set-marker end-marker nil)))
+
+(defun yaml-pro-ts-unindent-subtree ()
+  "Unindent the current subtree by one level.
+
+This function uses tree-sitter.  Indentation is controlled by the
+variable `yaml-pro-indent'."
+  (interactive)
+  (let ((at-subtree (yaml-pro-ts--until-mapping (treesit-node-at (point))))
+        (origin-marker (make-marker))
+        (end-marker (make-marker))
+        (indent-str (make-string yaml-pro-indent ?\s)))
+    (set-marker origin-marker (point))
+    (set-marker end-marker (treesit-node-end at-subtree))
+    (goto-char (treesit-node-start at-subtree))
+    (forward-line 0)
+    (while (< (point) end-marker)
+      (when (looking-at (regexp-quote indent-str))
+        (delete-char yaml-pro-indent))
+      (forward-line 1))
+    (goto-char origin-marker)
+    (set-marker origin-marker nil)
+    (set-marker end-marker nil)))
+
 (defun yaml-pro-ts-mark-subtree (up)
    "Mark the current subtree.
 This puts point at the start of the current subtree, and mark at
@@ -361,6 +405,9 @@ inserted to make the tree retain its original structure."
 
       (define-key map (kbd "s-<up>") #'yaml-pro-ts-move-subtree-up)
       (define-key map (kbd "s-<down>") #'yaml-pro-ts-move-subtree-down)
+
+      (define-key map (kbd "C-c >") #'yaml-pro-ts-indent-subtree)
+      (define-key map (kbd "C-c <") #'yaml-pro-ts-unindent-subtree)
 
       (define-key map (kbd "M-<return>") #'yaml-pro-ts-meta-return)
       (define-key map (kbd "M-?") #'yaml-pro-convolute-tree)
