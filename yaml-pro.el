@@ -783,7 +783,7 @@ PATH is the current path we have already traversed down."
         (yaml-pro--extract-paths val (append path (list (format "[%d]" n)))))
       (number-sequence 0 (1- (length tree)))
       tree)))
-   (t (concat (string-join path " > ") ": " tree))))
+   (t (concat (string-join path " ") ": " tree))))
 
 (defun yaml-pro-hide-overlay (ov)
   "Put fold-related properties on overlay OV."
@@ -1084,6 +1084,18 @@ Indentation is controlled by the variable `yaml-pro-indent'."
   (yaml-pro-move-subtree-up)
   (yaml-pro-next-subtree))
 
+(defun yaml-pro-create-index ()
+  (let* ((tree (yaml-parse-string-with-pos (buffer-string)))
+         (paths (yaml-pro--extract-paths tree))
+         (sorted-paths (seq-sort-by (lambda (path)
+                                      (car (yaml-pro--get-last-yaml-pos path)))
+                                    #'< paths)))
+    (seq-map
+     (lambda (item)
+       (let ((pos (car (yaml-pro--get-last-yaml-pos item))))
+         (cons item pos)))
+     sorted-paths)))
+
 (defconst yaml-pro-mode-map
   (let ((map (make-sparse-keymap)))
     (prog1 map
@@ -1129,6 +1141,8 @@ Indentation is controlled by the variable `yaml-pro-indent'."
           (error "Unsupported yaml.el version.  \
 Ensure that yaml.el package installed and at version %s"
                  yaml-pro-required-yaml-parser-version))
+        (setq imenu-generic-expression nil)
+        (setq imenu-create-index-function #'yaml-pro-create-index)
         (when (equal mode-name "YAML")
           (add-hook 'after-change-functions #'yaml-pro--after-change-hook nil t)))
     (remove-hook 'after-change-functions #'yaml-pro--after-change-hook t)))
