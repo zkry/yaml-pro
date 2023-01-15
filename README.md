@@ -47,7 +47,7 @@ tree-sitter and non-tree-sitter variants.
 
 ![eldoc](./docs/eldoc.gif)
 
-### Imenu (tree-sitter)
+### Imenu
 
 ![imenu](./docs/imenu.gif)
 
@@ -67,7 +67,7 @@ buffer and convert between the various styles with ease.
 
 ![jumping feature](./docs/yaml-pro-jump.gif)
 
-If using tree-sitter variant, you should be able to just use imenu.
+You can use imenu as well.
 
 ### Moving subtrees up and down
 
@@ -155,8 +155,9 @@ have the following commands available (with default keybindings).
 - **yaml-pro-edit-scalar** (<kbd>C-c '</kbd>)
   - (use prefix argument <kbd>C-u</kbd> to supply an initialization
     command to set major mode)
-- **yaml-pro-jump** (or **yaml-pro-consult-jump** if using consult)
-  (<kbd>C-c C-j</kbd>)
+- If your buffer is in yaml-pro-mode, `imenu` should index the entire
+  buffer's paths.
+
 
 *The default bindings are subject to change as this package is in beta*
 

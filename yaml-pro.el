@@ -2,7 +2,7 @@
 
 ;; Author: Zachary Romero
 ;; Maintainer: Zachary Romero
-;; Version: 0.1.4
+;; Version: 0.3.1
 ;; Package-Requires: ((emacs "26.1") (yaml "0.5.1"))
 ;; Homepage: https://github.com/zkry/yaml-pro
 ;; Keywords: tools
@@ -783,7 +783,7 @@ PATH is the current path we have already traversed down."
         (yaml-pro--extract-paths val (append path (list (format "[%d]" n)))))
       (number-sequence 0 (1- (length tree)))
       tree)))
-   (t (concat (string-join path " > ") ": " tree))))
+   (t (concat (string-join path " ") ": " tree))))
 
 (defun yaml-pro-hide-overlay (ov)
   "Put fold-related properties on overlay OV."
@@ -1038,7 +1038,7 @@ Indentation is controlled by the variable `yaml-pro-indent'."
       (save-excursion
         (forward-line 0)
         (unless (looking-at-p (make-string yaml-pro-indent ?\s))
-          (error "subtree can't be unintented further.")))
+          (error "Subtree can't be unintented further")))
       (if (not (looking-back "^[ ]*" nil))
           (progn
             (forward-line 0)
@@ -1084,6 +1084,19 @@ Indentation is controlled by the variable `yaml-pro-indent'."
   (yaml-pro-move-subtree-up)
   (yaml-pro-next-subtree))
 
+(defun yaml-pro-create-index ()
+  "Create an imenu index using the legacy parser."
+  (let* ((tree (yaml-parse-string-with-pos (buffer-string)))
+         (paths (yaml-pro--extract-paths tree))
+         (sorted-paths (seq-sort-by (lambda (path)
+                                      (car (yaml-pro--get-last-yaml-pos path)))
+                                    #'< paths)))
+    (seq-map
+     (lambda (item)
+       (let ((pos (car (yaml-pro--get-last-yaml-pos item))))
+         (cons item pos)))
+     sorted-paths)))
+
 (defconst yaml-pro-mode-map
   (let ((map (make-sparse-keymap)))
     (prog1 map
@@ -1110,6 +1123,8 @@ Indentation is controlled by the variable `yaml-pro-indent'."
                                           #'yaml-pro-consult-jump
                                         #'yaml-pro-jump)))))
 
+(make-obsolete 'yaml-pro-consult-jump "Use imenu feature instead of this command." "0.3.2")
+
 (defconst yaml-pro-required-yaml-parser-version "0.5.1")
 
 ;;;###autoload
@@ -1129,6 +1144,8 @@ Indentation is controlled by the variable `yaml-pro-indent'."
           (error "Unsupported yaml.el version.  \
 Ensure that yaml.el package installed and at version %s"
                  yaml-pro-required-yaml-parser-version))
+        (setq imenu-generic-expression nil)
+        (setq imenu-create-index-function #'yaml-pro-create-index)
         (when (equal mode-name "YAML")
           (add-hook 'after-change-functions #'yaml-pro--after-change-hook nil t)))
     (remove-hook 'after-change-functions #'yaml-pro--after-change-hook t)))
