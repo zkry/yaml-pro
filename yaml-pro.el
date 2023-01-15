@@ -2,7 +2,7 @@
 
 ;; Author: Zachary Romero
 ;; Maintainer: Zachary Romero
-;; Version: 0.1.4
+;; Version: 0.3.1
 ;; Package-Requires: ((emacs "26.1") (yaml "0.5.1"))
 ;; Homepage: https://github.com/zkry/yaml-pro
 ;; Keywords: tools
@@ -1038,7 +1038,7 @@ Indentation is controlled by the variable `yaml-pro-indent'."
       (save-excursion
         (forward-line 0)
         (unless (looking-at-p (make-string yaml-pro-indent ?\s))
-          (error "subtree can't be unintented further.")))
+          (error "Subtree can't be unintented further")))
       (if (not (looking-back "^[ ]*" nil))
           (progn
             (forward-line 0)
@@ -1085,6 +1085,7 @@ Indentation is controlled by the variable `yaml-pro-indent'."
   (yaml-pro-next-subtree))
 
 (defun yaml-pro-create-index ()
+  "Create an imenu index using the legacy parser."
   (let* ((tree (yaml-parse-string-with-pos (buffer-string)))
          (paths (yaml-pro--extract-paths tree))
          (sorted-paths (seq-sort-by (lambda (path)
@@ -1121,6 +1122,8 @@ Indentation is controlled by the variable `yaml-pro-indent'."
       (define-key map (kbd "C-c C-j") (if (featurep 'consult)
                                           #'yaml-pro-consult-jump
                                         #'yaml-pro-jump)))))
+
+(make-obsolete 'yaml-pro-consult-jump "Use imenu feature instead of this command." "0.3.2")
 
 (defconst yaml-pro-required-yaml-parser-version "0.5.1")
 
