@@ -321,8 +321,9 @@ If REMOVE is non-nil, pop item off `kill-ring'."
                    (<= (car indent-lengths) len))
                  (cdr indent-lengths)))
                ;; indent that the rest of kill text should have
-               (kill-indent (+ (apply #'min indent-lengths)
-                               (if single-top-lvl-p -2 0)))
+               (kill-indent (max (+ (apply #'min indent-lengths)
+                                    (if single-top-lvl-p -2 0))
+                                 0))
                (kill-indent-string (make-string kill-indent ?\s))
                (base-indent-string (make-string base-indent ?\s))
                (insertion-string (with-temp-buffer
