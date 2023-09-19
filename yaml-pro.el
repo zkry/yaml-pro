@@ -185,7 +185,32 @@
                             (goto-char (treesit-node-start list-item-top))
                             (current-column))))
         (goto-char (treesit-node-end list-item-top))
-        (insert "\n" (make-string indentation ?\s) "- ")))))
+        (cond
+         ;; After visiting the end of the top item, we check if we are
+         ;; in a newline or not. If we are not, we start a new line.
+         ((not (looking-at "^$"))
+          (insert "\n" (make-string indentation ?\s) "- "))
+         ;; When there are empty lines above the point after going to
+         ;; the end of the element. When in the top last element of a
+         ;; list, treesit-node-end considers empty lines as part of
+         ;; the list element.
+         ((save-excursion
+            (forward-line -1)
+            (looking-at "^$"))
+          (while (save-excursion
+                   (forward-line -1)
+                   (looking-at "^$"))
+            (forward-line -1))
+          (insert (make-string indentation ?\s) "- "))
+         ;; If none of the cases are true, we are at the beginning of
+         ;; a line just one line below the previous item, so we just
+         ;; start another item.
+         (t
+          (insert (make-string indentation ?\s) "- ")))
+        ;; We always insert a newline in order to conform with the
+        ;; definition of a "line" according to the POSIX standard
+        (save-excursion
+          (insert "\n"))))))
 
 (defun yaml-pro-convolute-tree ()
   "Swap the keys of the parent of the item at point and the parent's parent."

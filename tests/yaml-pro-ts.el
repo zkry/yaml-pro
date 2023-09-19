@@ -144,8 +144,90 @@ org-test.el, the library that is used by Org Mode for writing tests"
     (yaml-pro-ts-meta-return)
     (should
      (equal
-      "- 1: one\n- "
+      (concat
+       "- 1: one\n"
+       "- \n")
       (buffer-substring-no-properties (point-min) (point-max))))))
+
+(ert-deftest test-yaml-pro-ts-meta-return-trailing-newline ()
+  :tags '(yaml-pro-ts-meta-return)
+  (yaml-test-with-temp-text "- 1: one<point>\n"
+    (yaml-pro-ts-meta-return)
+    (should
+     (equal
+      (concat
+       "- 1: one\n"
+       "- \n")
+      (buffer-substring-no-properties (point-min) (point-max))))))
+
+(ert-deftest test-yaml-pro-ts-meta-return-trailing-newline-list ()
+  :tags '(yaml-pro-ts-meta-return)
+  (yaml-test-with-temp-text (concat
+                             "- 1:\n"
+                             "- 2:\n"
+                             "- 3:<point>\n")
+    (yaml-pro-ts-meta-return)
+    (should
+     (equal
+      (concat
+       "- 1:\n"
+       "- 2:\n"
+       "- 3:\n"
+       "- \n")
+      (buffer-substring-no-properties (point-min) (point-max)))))
+  (yaml-test-with-temp-text (concat
+                             "- 1:\n"
+                             "  1.1:\n"
+                             "- 2:\n"
+                             "  2.1:\n"
+                             "- 3:<point>\n"
+                             "  3.1:\n")
+    (yaml-pro-ts-meta-return)
+    (should
+     (equal
+      (concat
+       "- 1:\n"
+       "  1.1:\n"
+       "- 2:\n"
+       "  2.1:\n"
+       "- 3:\n"
+       "  3.1:\n"
+       "- \n")
+      (buffer-substring-no-properties (point-min) (point-max))))))
+
+(ert-deftest test-yaml-pro-ts-meta-return-multiple-trailing-newlines ()
+  "Test that empty lines are never reused.
+
+Users might have their own reasons for showing empty lines
+between items. If we reuse those lines, we are affecting such
+users."
+  :tags '(yaml-pro-ts-meta-return)
+  (yaml-test-with-temp-text (concat
+                             "- 1:\n"
+                             "  1.1:\n"
+                             "- 2:\n"
+                             "  2.1:\n"
+                             "- 3:<point>\n"
+                             "  3.1:\n"
+                             "\n"
+                             "\n"
+                             "\n")
+    (yaml-pro-ts-meta-return)
+    (should
+     (equal
+      (concat
+       "- 1:\n"
+       "  1.1:\n"
+       "- 2:\n"
+       "  2.1:\n"
+       "- 3:\n"
+       "  3.1:\n"
+       "- \n"
+       "\n"
+       "\n"
+       "\n")
+      (buffer-substring-no-properties (point-min) (point-max))))))
+
 
 (ert-deftest test-yaml-pro-ts-mark-subtree ()
   :tags '(yaml-pro-ts-mark-subtree)
