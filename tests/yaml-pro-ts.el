@@ -146,7 +146,7 @@ org-test.el, the library that is used by Org Mode for writing tests"
      (equal
       (concat
        "- 1: one\n"
-       "- \n")
+       "- ")
       (buffer-substring-no-properties (point-min) (point-max))))))
 
 (ert-deftest test-yaml-pro-ts-meta-return-trailing-newline ()

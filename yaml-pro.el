@@ -179,12 +179,16 @@
   "Insert new list item after current item."
   (interactive)
   (let* ((at-node (treesit-node-at (point)))
-         (list-item-top (yaml-pro-ts--until-list at-node)))
+         (list-item-top (yaml-pro-ts--until-list at-node))
+         (list-item-end-in-newline nil))
     (when list-item-top
       (let* ((indentation (save-excursion
                             (goto-char (treesit-node-start list-item-top))
                             (current-column))))
         (goto-char (treesit-node-end list-item-top))
+        ;; If the file didn't have a newline at the end of the item,
+        ;; then we are looking at ^$
+        (setq list-item-end-in-newline (looking-at "^$"))
         (cond
          ;; After visiting the end of the top item, we check if we are
          ;; in a newline or not. If we are not, we start a new line.
@@ -207,10 +211,14 @@
          ;; start another item.
          (t
           (insert (make-string indentation ?\s) "- ")))
-        ;; We always insert a newline in order to conform with the
-        ;; definition of a "line" according to the POSIX standard
-        (save-excursion
-          (insert "\n"))))))
+        ;; If the the user inserted a newline at the end of the item,
+        ;; we insert a newline. If the user didn't, we don't insert a
+        ;; newline. We do this to conform with the POSIX definition of
+        ;; a line and at the same time to act according the user's
+        ;; preferences.
+        (when list-item-end-in-newline
+          (save-excursion
+            (insert "\n")))))))
 
 (defun yaml-pro-convolute-tree ()
   "Swap the keys of the parent of the item at point and the parent's parent."
