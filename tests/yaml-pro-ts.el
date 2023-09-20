@@ -76,28 +76,100 @@ org-test.el, the library that is used by Org Mode for writing tests"
          "\n")
        "\n")
       (buffer-substring-no-properties (point-min) (point-max))))))
-
-(ert-deftest test-yaml-pro-ts-move-subtree-down ()
+2
+(ert-deftest test-yaml-pro-ts-move-subtree-down-point-beginning-of-line ()
   :tags '(yaml-pro-ts-move-subtree-down)
-  (yaml-test-with-temp-text (string-join
-                             '("<point>1:"
-                               "  1.1: null"
-                               "2:"
-                               "  2.1: null"
-                               "3:"
-                               "  3.1: null")
+  (yaml-test-with-temp-text (concat
+                             "<point>1:\n"
+                             "  1.1: null\n"
+                             "2:\n"
+                             "  2.1: null\n"
+                             "3:\n"
+                             "  3.1: null\n")
+    (yaml-pro-ts-move-subtree-down)
+    (should
+     (equal
+      (concat
+       "2:\n"
+       "  2.1: null\n"
+       "1:\n"
+       "  1.1: null\n"
+       "3:\n"
+       "  3.1: null\n")
+      (buffer-substring-no-properties (point-min) (point-max))))))
+
+(ert-deftest test-yaml-pro-ts-move-subtree-down-point-end-of-line ()
+  "Test that `yaml-pro-ts-move-subtree-down' works when the point is
+at the end of a line."
+  :tags '(yaml-pro-ts-move-subtree-down)
+  (yaml-test-with-temp-text (concat
+                             "1:<point>\n"
+                             "  1.1: null\n"
+                             "2:\n"
+                             "  2.1: null\n"
+                             "3:\n"
+                             "  3.1: null\n")
+    (yaml-pro-ts-move-subtree-down)
+    (should
+     (equal
+      (concat
+       "2:\n"
+       "  2.1: null\n"
+       "1:\n"
+       "  1.1: null\n"
+       "3:\n"
+       "  3.1: null\n")
+      (buffer-substring-no-properties (point-min) (point-max))))))
+
+(ert-deftest test-yaml-pro-ts-move-subtree-down-no-trailing-newline ()
+  "If the file doesn't have a trailing newline,
+ calling `yaml-pro-ts-move-subtree-down' should not add a
+ trailing newline."
+  :tags '(yaml-pro-ts-move-subtree-down)
+  (yaml-test-with-temp-text (concat
+                             "1:\n"
+                             "  1.1: null\n"
+                             "2:<point>\n"
+                             "  2.1: null\n"
+                             "3:\n"
+                             "  3.1: null")
+    (yaml-pro-ts-move-subtree-down)
+    (should
+     (equal
+      (concat
+       "1:\n"
+       "  1.1: null\n"
+       "3:\n"
+       "  3.1: null\n"
+       "2:\n"
+       "  2.1: null")
+      (buffer-substring-no-properties (point-min) (point-max))))))
+
+(ert-deftest test-yaml-pro-ts-move-subtree-down-trailing-newline ()
+  :tags '(yaml-pro-ts-move-subtree-down)
+  (yaml-test-with-temp-text (concat
+                             "1:\n"
+                             "  1.1: null\n"
+                             "2:<point>\n"
+                             "  2.1: null\n"
+                             "3:\n"
+                             "  3.1: null\n"
+                             "\n"
+                             "\n"
                              "\n")
     (yaml-pro-ts-move-subtree-down)
     (should
      (equal
-      (string-join
-       '("2:"
-         "  2.1: null"
-         "1:"
-         "  1.1: null"
-         "3:"
-         "  3.1: null")
-       "\n")
+      (concat
+       "1:\n"
+       "  1.1: null\n"
+       "3:\n"
+       "  3.1: null\n"
+       "\n"
+       "\n"
+       "\n"
+       "2:\n"
+       "  2.1: null\n")
       (buffer-substring-no-properties (point-min) (point-max))))))
 
 (ert-deftest test-yaml-pro-ts-unindent-subtree ()

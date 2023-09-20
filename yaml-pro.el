@@ -135,6 +135,7 @@
     (when next-node
       (goto-char (treesit-node-start next-node)))))
 
+
 (defun yaml-pro-ts-move-subtree (dir)
   "Get the current and DIR node and swap the contents of the two."
   (interactive)
@@ -147,12 +148,19 @@
          (at-start-marker (make-marker))
          (at-end-marker (make-marker))
          (sibling-start-marker (make-marker))
-         (sibling-end-marker (make-marker)))
+         (sibling-end-marker (make-marker))
+         (sibling-end-trailing-newline nil))
     (when (and tree-top sibling-node)
       (set-marker at-start-marker (treesit-node-start tree-top))
       (set-marker at-end-marker (treesit-node-end tree-top))
       (set-marker sibling-start-marker (treesit-node-start sibling-node))
       (set-marker sibling-end-marker (treesit-node-end sibling-node))
+      ;; Check if there's a trailing newline after the last node. We
+      ;; do this because we don't want to insert a trailing newline if
+      ;; the user doesn't have a trailing newline.
+      (save-excursion
+        (goto-char sibling-end-marker)
+        (setq sibling-end-trailing-newline (equal (char-before) ?\n)))
       (let* ((at-tree-text (buffer-substring-no-properties
                             at-start-marker at-end-marker))
              (sibling-tree-text (buffer-substring-no-properties
@@ -160,9 +168,19 @@
         (delete-region at-start-marker at-end-marker)
         (delete-region sibling-start-marker sibling-end-marker)
         (goto-char sibling-start-marker)
+        ;; Empty newlines that are after the last node are moved along
+        ;; with the last node, so after text has been deleted from
+        ;; at-node and sibling-node, there's no newline for
+        ;; at-node. We only do this when the last item has a trailing
+        ;; newline.
+        (when (and (eobp) sibling-end-trailing-newline)
+          (save-excursion
+            (insert "\n")))
         (insert at-tree-text)
         (goto-char at-start-marker)
-        (insert sibling-tree-text)
+        ;; We delete the last newline (if there's one) because when we
+        ;; move to `at-start-marker', there's already an empty line.
+        (insert (replace-regexp-in-string "\n\\'" "" sibling-tree-text))
         (goto-char sibling-start-marker)))))
 
 (defun yaml-pro-ts-move-subtree-up ()
