@@ -135,6 +135,7 @@
     (when next-node
       (goto-char (treesit-node-start next-node)))))
 
+
 (defun yaml-pro-ts-move-subtree (dir)
   "Get the current and DIR node and swap the contents of the two."
   (interactive)
@@ -147,12 +148,19 @@
          (at-start-marker (make-marker))
          (at-end-marker (make-marker))
          (sibling-start-marker (make-marker))
-         (sibling-end-marker (make-marker)))
+         (sibling-end-marker (make-marker))
+         (sibling-end-trailing-newline nil))
     (when (and tree-top sibling-node)
       (set-marker at-start-marker (treesit-node-start tree-top))
       (set-marker at-end-marker (treesit-node-end tree-top))
       (set-marker sibling-start-marker (treesit-node-start sibling-node))
       (set-marker sibling-end-marker (treesit-node-end sibling-node))
+      ;; Check if there's a trailing newline after the last node. We
+      ;; do this because we don't want to insert a trailing newline if
+      ;; the user doesn't have a trailing newline.
+      (save-excursion
+        (goto-char sibling-end-marker)
+        (setq sibling-end-trailing-newline (equal (char-before) ?\n)))
       (let* ((at-tree-text (buffer-substring-no-properties
                             at-start-marker at-end-marker))
              (sibling-tree-text (buffer-substring-no-properties
@@ -160,9 +168,19 @@
         (delete-region at-start-marker at-end-marker)
         (delete-region sibling-start-marker sibling-end-marker)
         (goto-char sibling-start-marker)
+        ;; Empty newlines that are after the last node are moved along
+        ;; with the last node, so after text has been deleted from
+        ;; at-node and sibling-node, there's no newline for
+        ;; at-node. We only do this when the last item has a trailing
+        ;; newline.
+        (when (and (eobp) sibling-end-trailing-newline)
+          (save-excursion
+            (insert "\n")))
         (insert at-tree-text)
         (goto-char at-start-marker)
-        (insert sibling-tree-text)
+        ;; We delete the last newline (if there's one) because when we
+        ;; move to `at-start-marker', there's already an empty line.
+        (insert (replace-regexp-in-string "\n\\'" "" sibling-tree-text))
         (goto-char sibling-start-marker)))))
 
 (defun yaml-pro-ts-move-subtree-up ()
@@ -179,13 +197,46 @@
   "Insert new list item after current item."
   (interactive)
   (let* ((at-node (treesit-node-at (point)))
-         (list-item-top (yaml-pro-ts--until-list at-node)))
+         (list-item-top (yaml-pro-ts--until-list at-node))
+         (list-item-end-in-newline nil))
     (when list-item-top
       (let* ((indentation (save-excursion
                             (goto-char (treesit-node-start list-item-top))
                             (current-column))))
         (goto-char (treesit-node-end list-item-top))
-        (insert "\n" (make-string indentation ?\s) "- ")))))
+        ;; If the file didn't have a newline at the end of the item,
+        ;; then we are looking at ^$
+        (setq list-item-end-in-newline (looking-at "^$"))
+        (cond
+         ;; After visiting the end of the top item, we check if we are
+         ;; in a newline or not. If we are not, we start a new line.
+         ((not (looking-at "^$"))
+          (insert "\n" (make-string indentation ?\s) "- "))
+         ;; When there are empty lines above the point after going to
+         ;; the end of the element. When in the top last element of a
+         ;; list, treesit-node-end considers empty lines as part of
+         ;; the list element.
+         ((save-excursion
+            (forward-line -1)
+            (looking-at "^$"))
+          (while (save-excursion
+                   (forward-line -1)
+                   (looking-at "^$"))
+            (forward-line -1))
+          (insert (make-string indentation ?\s) "- "))
+         ;; If none of the cases are true, we are at the beginning of
+         ;; a line just one line below the previous item, so we just
+         ;; start another item.
+         (t
+          (insert (make-string indentation ?\s) "- ")))
+        ;; If the the user inserted a newline at the end of the item,
+        ;; we insert a newline. If the user didn't, we don't insert a
+        ;; newline. We do this to conform with the POSIX definition of
+        ;; a line and at the same time to act according the user's
+        ;; preferences.
+        (when list-item-end-in-newline
+          (save-excursion
+            (insert "\n")))))))
 
 (defun yaml-pro-convolute-tree ()
   "Swap the keys of the parent of the item at point and the parent's parent."
