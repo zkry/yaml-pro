@@ -1059,9 +1059,10 @@ PATH is the current path we have already traversed down."
 
 Indentation is controlled by the variable `yaml-pro-indent'."
   (interactive)
-  (let* ((parse-tree (yaml-pro--get-buffer-tree))
-         (at-bounds (yaml-pro-get-block-bounds parse-tree (point))))
-    (save-excursion
+  (save-excursion
+    (back-to-indentation)
+    (let* ((parse-tree (yaml-pro--get-buffer-tree))
+           (at-bounds (yaml-pro-get-block-bounds parse-tree (point))))
       (goto-char (car at-bounds))
       (if (not (looking-back "^[ ]*" nil))
           (progn
