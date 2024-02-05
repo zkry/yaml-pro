@@ -118,23 +118,32 @@
 
 
 (defun yaml-pro-ts-prev-subtree ()
-  "Move the point to the previous subtree."
+  "Move the point to the previous subtree or list."
   (interactive)
   (let* ((at-node (treesit-node-at (point)))
-         (tree-top (yaml-pro-ts--until-mapping at-node))
-         (prev-node (yaml-pro-ts-prev-mapping-node tree-top "block_mapping_pair")))
-    (when prev-node
-      (goto-char (treesit-node-start prev-node)))))
+         (prev-node
+          (if (and (equal (treesit-node-type at-node) "-")
+                   (equal (treesit-node-type (treesit-node-parent at-node))
+                          "block_sequence_item"))
+              (yaml-pro-ts-prev-mapping-node (yaml-pro-ts--until-list at-node) "block_sequence_item")
+            (yaml-pro-ts-prev-mapping-node (yaml-pro-ts--until-mapping at-node) "block_mapping_pair"))))
+    (if prev-node
+        (goto-char (treesit-node-start prev-node))
+      (ding))))
 
 (defun yaml-pro-ts-next-subtree ()
-  "Move the point to the next subtree."
+  "Move the point to the next subtree or list."
   (interactive)
   (let* ((at-node (treesit-node-at (point)))
-         (tree-top (yaml-pro-ts--until-mapping at-node))
-         (next-node (yaml-pro-ts-next-mapping-node tree-top "block_mapping_pair")))
-    (when next-node
-      (goto-char (treesit-node-start next-node)))))
-
+         (next-node
+          (if (and (equal (treesit-node-type at-node) "-")
+                   (equal (treesit-node-type (treesit-node-parent at-node))
+                          "block_sequence_item"))
+              (yaml-pro-ts-next-mapping-node (yaml-pro-ts--until-list at-node) "block_sequence_item")
+            (yaml-pro-ts-next-mapping-node (yaml-pro-ts--until-mapping at-node) "block_mapping_pair"))))
+    (if next-node
+        (goto-char (treesit-node-start next-node))
+      (ding))))
 
 (defun yaml-pro-ts-move-subtree (dir)
   "Get the current and DIR node and swap the contents of the two."
