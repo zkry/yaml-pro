@@ -63,6 +63,14 @@
    (lambda (node)
      (equal (treesit-node-type node) "block_mapping_pair"))))
 
+(defun yaml-pro-ts--until-mapping-or-list (node)
+  "Recursively look up from NODE returning first `block_mapping_pair'."
+  (treesit-parent-until
+   node
+   (lambda (node)
+     (or (equal (treesit-node-type node) "block_mapping_pair")
+         (equal (treesit-node-type node) "block_sequence_item")))))
+
 (defun yaml-pro-ts--until-list (node)
   "Recursively look up from NODE returning first `block_sequence_item'."
   (treesit-parent-until
@@ -92,8 +100,8 @@
   "Move the point to the parent tree."
   (interactive)
   (let* ((at-node (treesit-node-at (point)))
-         (tree-top (yaml-pro-ts--until-mapping at-node))
-         (parent-tree-top (and tree-top (yaml-pro-ts--until-mapping tree-top))))
+         (tree-top (yaml-pro-ts--until-mapping-or-list at-node))
+         (parent-tree-top (and tree-top (yaml-pro-ts--until-mapping-or-list tree-top))))
     (when parent-tree-top
       (goto-char (treesit-node-start parent-tree-top)))))
 
