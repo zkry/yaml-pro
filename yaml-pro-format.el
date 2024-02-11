@@ -40,10 +40,11 @@
 ;; - [x] Formatting after "-" in block sequence
 ;; - [x] Multiple spaces reduced to one space (e.g. `["a",     "b", "c"]`)
 ;; - [x] Empty lines are reduced down to one empty line
-;; - [ ] Only 2 spaces for indentation
-;;   - [ ] Block scalars, if they don't have a indent spec should be minimally indented.
-;;   - [ ] Multi-line strings should be minimally indented if they span multiple lines.
-;; - [ ] Comments should indent to the elements after them
+;; - [x] Only 2 spaces for indentation
+;;   - [x] Block scalars, if they don't have a indent spec should be minimally indented.
+;;   - [x] Multi-line strings should be minimally indented if they span multiple lines.
+;;   - [ ] Dont mess with |# or >#
+;; - [x] Comments should indent to the elements after them
 ;; - [ ] flow_mapping past column X should be broken
 ;; - [ ] flow_sequence past column X should be broken
 ;; - [ ] single quotes should change to doulbe quotes if they don't have backslash
@@ -67,7 +68,7 @@
           (when (not (= (treesit-node-start paren-node)
                         (treesit-node-end key-node)))
             (push (make-overlay (treesit-node-end key-node) (treesit-node-start paren-node)) del-ovs))
-          (when (and (string-suffix-p "_scalar" (symbol-name (treesit-node-type val-node)))
+          (when (and (string-suffix-p "_scalar" (treesit-node-type val-node))
                      (not (= (1+ (treesit-node-end paren-node))
                              (treesit-node-start val-node))))
             (let ((ov (make-overlay (treesit-node-end paren-node)
@@ -97,7 +98,7 @@
     (save-excursion
       (save-match-data
         (goto-char (point-min))
-        (while (search-forward-regexp "[ \t][ \t]+")
+        (while (search-forward-regexp "[ \t][ \t]+" nil t)
           (when (not (looking-back "\n *" (- (point) 30)))
             (let* ((at-node-type (treesit-node-type (treesit-node-on (match-beginning 0) (match-end 0)))))
               (when (not (member at-node-type '("string_scalar" "double_quote_scalar" "single_quote_scalar" "block_scalar")))
@@ -112,12 +113,13 @@
     (save-excursion
       (save-match-data
         (goto-char (point-min))
-        (while (search-forward-regexp "\\(?:\n[ \t]*\\)\\(?:\n[ \t]*\\)+\n")
+        (while (search-forward-regexp "\\(?:\n[ \t]*\\)\\(?:\n[ \t]*\\)+\n" nil t)
           (let* ((on-node-type (treesit-node-on (match-beginning 0) (match-end 0))))
             (when (not (member on-node-type '("string_scalar" "double_quote_scalar" "single_quote_scalar" "block_scalar")))
               (let* ((ov (make-overlay (match-beginning 0 ) (match-end 0))))
-                (overlay-put ov 'yaml-pro-format-insert "\n\n\n")
-                (push ov del-ovs)))))))))
+                (overlay-put ov 'yaml-pro-format-insert "\n\n")
+                (push ov del-ovs)))))))
+    del-ovs))
 
 (defun yaml-pro-format-ts--node-indent (node)
   "Return the number of indent parents of NODE."
@@ -126,12 +128,17 @@
       (when (and (equal (treesit-node-field-name node) "key")
                  (not (equal (treesit-node-type (treesit-node-parent node)) "flow_pair")))
         (cl-decf ct))
-      (when (member (treesit-node-type node) '("-" "{"))
+      (when (member (treesit-node-type node) '("-" "{" "["))
         (cl-decf ct))
-      (when (member (treesit-node-type node) '("block_mapping" "block_sequence" "flow_mapping"))
+      (when (member (treesit-node-type node) '("block_mapping" "block_sequence" "flow_mapping" "flow_sequence"))
         (cl-incf ct))
       (setq node (treesit-node-parent node)))
     ct))
+
+(defcustom yaml-pro-format-indent 2
+  "Amount of spaces to indent YAML."
+  :group 'yaml-pro
+  :type 'integer)
 
 (defun yaml-pro-format-ts--indent ()
   ""
@@ -139,11 +146,34 @@
     (save-excursion
       (save-match-data
         (goto-char (point-min))
-        (while (search-forward-regexp "\\(\n +\\)[^ \t\n]")
-          (let* ((on-node (treesit-node-on (match-beginning 0) (match-end 0))))
-
-            ))))
+        (while (search-forward-regexp "\\(\n +\\)[^ \t\n\r]" nil t)
+          (forward-char -1)
+          (let* ((at-node (treesit-node-at (point)))
+                 (indent (yaml-pro-format-ts--node-indent at-node))
+                 (indent-str (make-string (* indent yaml-pro-format-indent) ?\s))
+                 (ov (make-overlay (1+ (match-beginning 0)) (point))))
+            (overlay-put ov 'yaml-pro-format-insert indent-str)
+            (push ov del-ovs)))))
     del-ovs))
 
 (defun yaml-pro-format-ts ()
-  (interactive))
+  (interactive)
+  (let* ((fmt-functions '(yaml-pro-format-ts--block-sequence
+                          yaml-pro-format-ts--single-space
+                          yaml-pro-format-ts--reduce-newllines
+                          yaml-pro-format-ts--reduce-spaces
+                          yaml-pro-format-ts--indent)))
+    (dolist (f fmt-functions)
+      (let* ((ovs (funcall f)))
+        (save-excursion
+          (dolist (ov ovs)
+            (let* ((insert-text (overlay-get ov 'yaml-pro-format-insert)))
+              (goto-char (overlay-start ov))
+              (delete-region (overlay-start ov) (overlay-end ov))
+              (when insert-text
+                (insert insert-text))
+              (delete-overlay ov))))))))
+
+(provide 'yaml-pro-format)
+
+;;; yaml-pro-format.el ends here
