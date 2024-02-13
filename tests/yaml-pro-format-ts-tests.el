@@ -46,14 +46,25 @@
                   (buffer-string))))
       (equal got out))))
 
+(defvar yaml-pro-format-fail-cases nil)
+
 (defun yaml-pro-format-ts-tests--run ()
   (interactive)
+  ;; (setq yaml-pro-format-fail-cases nil)
   (let* ((total (length yaml-pro-format-ts-tests-cases))
          (ct 0))
     (dolist (test-case yaml-pro-format-ts-tests-cases)
-      (when (yaml-pro-format-ts-tests--run-test test-case)
-        (cl-incf ct)))
-    (message "Ran all tests. Results: %d/%d" ct total)))
+      (ignore-errors
+        (if (yaml-pro-format-ts-tests--run-test test-case)
+            (cl-incf ct)
+          (push test-case yaml-pro-format-fail-cases))))
+    (message "Ran all tests. Results: %d/%d" ct total))
+  ;; (f-write (prin1-to-string yaml-pro-format-fail-cases) 'utf-8 "./fail-cases.el")
+  )
+
+;; 2-12: 251/718
+;; 2-12: 295/718
+;; 2-12: 300/718
 
 ;; copied via the function `yaml-pro-format-ts-tests-extract-prettier-tests'
 (defconst yaml-pro-format-ts-tests-cases
