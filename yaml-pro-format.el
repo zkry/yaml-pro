@@ -45,7 +45,10 @@
   :group 'yaml-pro
   :type 'integer)
 
-(defcustom yaml-pro-format-features '()
+(defcustom yaml-pro-format-features
+  '(reduce-newlines document-separator-own-line oneline-flow block-formatting
+                    reduce-spaces bm-fn-next-line clean-doc-end remove-spaces-before-comments
+                    expand-long-flow single-to-double indent)
   "Features to enable when formatting buffer."
   :group 'yaml-pro
   :type '(set (const :tag "Remove adjacent blank lines, leaving at most one"
@@ -346,7 +349,7 @@ Assumes that flow sequences have been previously reduced to one line."
          (ovs '()))
     (pcase-dolist (`(_ . ,node) nodes)
       (when (save-excursion (goto-char (treesit-node-end node))
-                            (and (looking-at-p ", *\n")
+                            (and (looking-at-p ",? *\n")
                                  (> (current-column) yaml-pro-format-print-width)))
         (let* ((capture (treesit-query-capture
                          node
@@ -718,6 +721,30 @@ OV is deleted after this function finishes."
                 (push ov ovs))))))))
     ovs))
 
+
+(defconst yaml-pro-format-ts-functions
+  '((reduce-newlines . yaml-pro-format-ts--reduce-newlines)
+    (document-separator-own-line . yaml-pro-format-ts--document-separator-own-line)
+    (oneline-flow . yaml-pro-format-ts--oneline-flow)
+    (block-formatting . yaml-pro-format-ts--bm-single-space) ;
+    ((or oneline-flow expand-flow) . yaml-pro-format-ts--flow-seq-grouping-space)
+    (reduce-spaces . yaml-pro-format-ts--reduce-spaces)
+    (block-formatting . yaml-pro-format-ts--block-sequence) ;
+    (bm-fn-next-line . yaml-pro-format-ts--bm-fn-next-line) ;
+    (clean-doc-end . yaml-pro-format-ts--clean-doc-end)
+    (remove-spaces-before-comments . yaml-pro-format-ts--remove-spaces-before-comments)
+    (expand-long-flow .
+                      (lambda ()
+                        (yaml-pro-format-ts--run-while-changing
+                         '(yaml-pro-format-ts--expand-long-flow-sequence
+                           yaml-pro-format-ts--expand-long-flow-mapping))))
+    (single-to-double .
+                      yaml-pro-format-ts--single-to-double)
+    ;; yaml-pro-format-ts--prose-wrap TODO
+    (indent . yaml-pro-format-ts--indent))
+  "Alist of feature symbol and formatting functions.")
+
+
 (defun yaml-pro-format-ts ()
   "Format the YAML buffer according to pre-defined rules."
   (interactive)
@@ -727,23 +754,17 @@ OV is deleted after this function finishes."
     (goto-char (point-max))
     (insert "\n"))
   (yaml-pro-format-ts--create-indent-groups)
-  (let* ((fmt-functions '(yaml-pro-format-ts--reduce-newlines  ; reduce-newlines
-                          yaml-pro-format-ts--document-separator-own-line ; document-separator-own-line
-                          yaml-pro-format-ts--oneline-flow  ; oneline-flow
-                          yaml-pro-format-ts--bm-single-space ; block-formatting
-                          yaml-pro-format-ts--flow-seq-grouping-space ; oneline-flow || expand-flow
-                          yaml-pro-format-ts--reduce-spaces ; reduce-spaces
-                          yaml-pro-format-ts--block-sequence ; block-formatting
-                          yaml-pro-format-ts--bm-fn-next-line ; bm-fn-next-line
-                          yaml-pro-format-ts--clean-doc-end ; clean-doc-end
-                          yaml-pro-format-ts--remove-spaces-before-comments ; remove-spaces-before-comments
-                          (lambda () ; expand-long-flow
-                            (yaml-pro-format-ts--run-while-changing
-                             '(yaml-pro-format-ts--expand-long-flow-sequence
-                               yaml-pro-format-ts--expand-long-flow-mapping)))
-                          yaml-pro-format-ts--single-to-double
-                          ;; yaml-pro-format-ts--prose-wrap TODO
-                          yaml-pro-format-ts--indent)))
+  (let* ((fmt-functions
+          (seq-map
+           #'cdr
+           (seq-filter
+            (pcase-lambda (`(,sym . _))
+              (pcase sym
+                (`(or . ,elts)
+                 (seq-find (lambda (sym) (member sym yaml-pro-format-features))
+                           elts))
+                (sym (member sym yaml-pro-format-features))))
+            yaml-pro-format-ts-functions))))
     (dolist (f fmt-functions)
       (let* ((ovs (funcall f)))
         (save-excursion
