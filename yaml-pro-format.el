@@ -35,22 +35,6 @@
 (require 'treesit)
 (require 'cl-lib)
 
-
-;; - [x] Formatting around ":" in block mapping
-;; - [x] Formatting after "-" in block sequence
-;; - [x] Multiple spaces reduced to one space (e.g. `["a",     "b", "c"]`)
-;; - [x] Empty lines are reduced down to one empty line
-;; - [x] Only 2 spaces for indentation
-;;   - [x] Block scalars, if they don't have a indent spec should be minimally indented.
-;;   - [x] Multi-line strings should be minimally indented if they span multiple lines.
-;;   - [ ] Dont mess with |# or >#
-;; - [x] Comments should indent to the elements after them
-;; - [x] Bring flow onto one line
-;; - [x] flow_mapping past column X should be broken
-;; - [x] flow_sequence past column X should be broken
-;; - [ ] single quotes should change to doulbe quotes if they don't have backslash
-;; - [ ] trailing space deleted
-
 (defcustom yaml-pro-format-indent 2
   "Amount of spaces to indent YAML."
   :group 'yaml-pro
@@ -62,21 +46,28 @@
   :type 'boolean)
 
 (defun yaml-pro-format-ts--bm-single-space ()
+  "Ensure proper spacing around the colon character in a block mapping."
   (let* ((nodes (treesit-query-capture
                  (treesit-buffer-root-node)
-                 '((block_mapping_pair key: (flow_node) value: [(flow_node) (block_node)]) @bm)))
+                 '((block_mapping_pair
+                    key: (flow_node)
+                    value: [(flow_node) (block_node)])
+                   @bm)))
          (del-ovs '()))
     (save-excursion
       (pcase-dolist (`(_ . ,node) nodes)
-        (let* ((child-nodes (treesit-query-capture
-                             node
-                             '((block_mapping_pair key: (flow_node) @key
-                                                   ":" @colon
-                                                   value: [(flow_node) (block_node)] @val))))
-               (child-nodes (seq-filter (pcase-lambda (`(_ . ,n)) ;; TODO - will I need this pattern in other places?
-                                               (treesit-node-eq (treesit-node-parent n)
-                                                                node))
-                                             child-nodes))
+        (let* ((child-nodes
+                (treesit-query-capture
+                 node
+                 '((block_mapping_pair
+                    key: (flow_node) @key
+                    ":" @colon
+                    value: [(flow_node) (block_node)] @val))))
+               (child-nodes (seq-filter
+                             (pcase-lambda (`(_ . ,n))
+                               (treesit-node-eq (treesit-node-parent n)
+                                                node))
+                             child-nodes))
                (colon-node (alist-get 'colon child-nodes))
                (key-node (alist-get 'key child-nodes))
                (val-node (alist-get 'val child-nodes)))
@@ -88,7 +79,6 @@
                      (not (equal (treesit-node-type (treesit-node-at (treesit-node-end key-node)))
                                  "alias_name")))
             (push (make-overlay (treesit-node-end key-node) (treesit-node-start colon-node)) del-ovs))
-
           (when (and (or (string-suffix-p "_scalar" (treesit-node-type val-node))
                          (equal (treesit-node-type val-node) "flow_node"))
                      (not (= (1+ (treesit-node-end colon-node))
@@ -100,19 +90,10 @@
                                     (treesit-node-start val-node))))
               (overlay-put ov 'yaml-pro-format-insert " ")
               (push ov del-ovs))))))
-    ;; (pcase-dolist (`(_ . ,node) (treesit-query-capture
-    ;;                              (treesit-buffer-root-node)
-    ;;                              '((block_mapping_pair key: (_) :anchor ":") @bmp)))
-    ;;   (let-alist (treesit-query-capture node '((block_mapping_pair key: (_) @key :anchor ":" @colon)))
-    ;;     (when (string-match-p
-    ;;            " +"
-    ;;            (buffer-substring-no-properties (treesit-node-end .key) (treesit-node-start .colon)))
-    ;;       (let* ((ov (make-overlay (treesit-node-end .key) (treesit-node-start .colon))))
-    ;;         (push ov del-ovs)))))
     del-ovs))
 
 (defun yaml-pro-format-ts--oneline-flow ()
-  ""
+  "Compress flow elements to one line."
   (let* ((nodes (treesit-query-capture
                  (treesit-buffer-root-node)
                  '((document
@@ -126,29 +107,58 @@
                      [(flow_mapping) (flow_sequence)] @flow)))))
          (del-ovs '()))
     (pcase-dolist (`(_ . ,node) nodes)
-      (save-match-data
-        (save-excursion
-          (goto-char (treesit-node-start node))
-          (while (search-forward "\n" (treesit-node-end node) t)
-            (unless (equal (treesit-node-type (treesit-node-at (match-beginning 0))) "comment")
-              (let* ((ov (make-overlay (match-beginning 0) (match-end 0))))
-                (push ov del-ovs)))))))
+      ;; don't compress flow with comments
+      (unless (treesit-query-capture node '((comment) @comment))
+        (save-match-data
+          (save-excursion
+            (goto-char (treesit-node-start node))
+            (while (search-forward "\n" (treesit-node-end node) t)
+              (unless (equal (treesit-node-type (treesit-node-at (match-beginning 0))) "comment")
+                (let* ((ov (make-overlay (match-beginning 0) (match-end 0))))
+                  (push ov del-ovs))))))))
+    ;; Following code ensures that compressed flow is pretty formatted
+    (let* ((nodes (treesit-query-capture
+                   (treesit-buffer-root-node)
+                   '((flow_mapping "," @comma)))))
+      (pcase-dolist (`(_ . ,comma-node) nodes)
+        (cond
+         ((save-excursion (goto-char (treesit-node-end comma-node))
+                          (looking-at-p "}"))
+          (let* ((ov (make-overlay (treesit-node-start comma-node)
+                                   (treesit-node-end comma-node))))
+            (overlay-put ov 'yaml-pro-format-insert " ")
+            (push ov del-ovs)))
+         ((save-excursion (goto-char (treesit-node-start comma-node))
+                          (looking-back "[^\n] *" (- (point) 80)))
+          (let* ((ov (make-overlay (save-excursion
+                                     (goto-char (treesit-node-start comma-node))
+                                     (skip-chars-backward " ")
+                                     (point))
+                                   (treesit-node-start comma-node))))
+            (push ov del-ovs))))))
+    (let* ((nodes (treesit-query-capture
+                   (treesit-buffer-root-node)
+                   '((flow_mapping "}" @rbrace)))))
+      (pcase-dolist (`(_ . ,rbrace-node) nodes)
+        (when (save-excursion (goto-char (treesit-node-start rbrace-node))
+                              (not (looking-back "[ \n{]" (- (point) 3))))
+          (let* ((ov (make-overlay (treesit-node-start rbrace-node)
+                                   (treesit-node-start rbrace-node))))
+            (overlay-put ov 'yaml-pro-format-insert " ")
+            (push ov del-ovs)))))
+    (let* ((nodes (treesit-query-capture
+                   (treesit-buffer-root-node)
+                   '((flow_mapping "{" @lbrace)))))
+      (pcase-dolist (`(_ . ,lbrace-node) nodes)
+        (when (save-excursion (goto-char (treesit-node-end lbrace-node))
+                              (not (looking-at-p "[ \n}]")))
+          (let* ((ov (make-overlay (treesit-node-end lbrace-node)
+                                   (treesit-node-end lbrace-node))))
+            (overlay-put ov 'yaml-pro-format-insert " ")
+            (push ov del-ovs)))))
     ;; (let* ((nodes (treesit-query-capture
     ;;                (treesit-buffer-root-node)
-    ;;                '("," @comma))))
-    ;;   (pcase-dolist (`(_ . ,comma-node) nodes)
-    ;;     (save-excursion
-    ;;       (goto-char (treesit-node-start comma-node))
-    ;;       (when (looking-back "[^\n] *" (- (point) 80))
-    ;;         (let* ((ov (make-overlay (save-excursion
-    ;;                                    (goto-char (treesit-node-start comma-node))
-    ;;                                    (skip-chars-backward " ")
-    ;;                                    (point))
-    ;;                                  (treesit-node-start comma-node))))
-    ;;           (push ov del-ovs))))))
-    ;; (let* ((nodes (treesit-query-capture
-    ;;                (treesit-buffer-root-node)
-    ;;                '(":" @colon))))
+    ;;                '((flow_pair ":" @colon)))))
     ;;   (pcase-dolist (`(_ . ,colon-node) nodes)
     ;;     (save-excursion
     ;;       (goto-char (treesit-node-start colon-node))
@@ -179,8 +189,8 @@
             (push ov del-ovs)))))
     del-ovs))
 
-(defun yaml-pro-format-ts--flow-groupings-nospace ()
-  "Remove all whitespace before and after flow nodes' [ ] { } chars."
+(defun yaml-pro-format-ts--flow-seq-grouping-space ()
+  "Remove all whitespace before and after flow nodes' [ ] chars."
   (let* ((nodes (treesit-query-capture
                  (treesit-buffer-root-node)
                  '((flow_mapping) @flow
@@ -192,11 +202,28 @@
                   '((flow_sequence "[" @open :anchor (_) @after-open-node
                                    (_) @before-close-node :anchor "]" @close)))
         (when (and .open .close .after-open-node .before-close-node)
-          (let* ((ov-beg (make-overlay (treesit-node-end .open) (treesit-node-start .after-open-node)))
-                 (ov-end (make-overlay (treesit-node-end .before-close-node) (treesit-node-start .close))))
-            (push ov-beg del-ovs)
-            (unless (equal (treesit-node-type .before-close-node) "comment")
-              (push ov-end del-ovs))))))
+          (if (= (line-number-at-pos (treesit-node-end .open))
+                 (line-number-at-pos (treesit-node-start .close)))
+              ;; If [ ] is on one line, remove spacing after [ and before ].
+              (let* ((ov-beg (make-overlay (treesit-node-end .open) (treesit-node-start .after-open-node)))
+                     (ov-end (make-overlay (treesit-node-end .before-close-node) (treesit-node-start .close))))
+                (push ov-beg del-ovs)
+                (unless (equal (treesit-node-type .before-close-node) "comment")
+                  (push ov-end del-ovs)))
+            ;; If [ ] is on multiple lines, ensure [ ] are on their own lines.
+            (let* ((after-open-indent (yaml-pro-format-ts--node-indent .after-open-node))
+                   (ov-beg (make-overlay (treesit-node-end .open) (treesit-node-start .after-open-node)))
+                   (ov-end (make-overlay (treesit-node-end .before-close-node) (treesit-node-start .close))))
+              (overlay-put ov-beg 'yaml-pro-format-insert (concat "\n" (make-string
+                                                                        (* after-open-indent yaml-pro-format-indent)
+                                                                        ?\s)))
+              (overlay-put ov-end 'yaml-pro-format-insert (concat ",\n" (make-string
+                                                                         (* (- after-open-indent 1)
+                                                                            yaml-pro-format-indent)
+                                                                         ?\s)))
+              (push ov-beg del-ovs)
+              (unless (equal (treesit-node-type .before-close-node) "comment")
+                (push ov-end del-ovs)))))))
     del-ovs))
 
 (defun yaml-pro-format-ts--bm-fn-next-line ()
@@ -333,7 +360,10 @@ Assumes that flow mappings have been previously reduced to one line."
                          '((flow_mapping "}" @close :anchor)))))
           (pcase-dolist (`(_ . ,close) capture)
             (when (treesit-node-eq (treesit-node-parent close) node)
-              (let* ((ov (make-overlay (treesit-node-start close) (treesit-node-start close)))
+              (let* ((ov (make-overlay (save-excursion (goto-char (treesit-node-start close))
+                                                       (skip-chars-backward " ")
+                                                       (point))
+                                       (treesit-node-start close)))
                      (indent (yaml-pro-format-ts--node-indent close))
                      (end-str "\n"))
                 (unless (save-excursion (goto-char (treesit-node-start close))  ; we only add this ov
@@ -347,7 +377,7 @@ Assumes that flow mappings have been previously reduced to one line."
     ovs))
 
 (defun yaml-pro-format-ts--block-sequence ()
-  ""
+  "Ensure proper spacing around sequences' - character."
   (let* ((nodes (treesit-query-capture
                  (treesit-buffer-root-node)
                  '((block_sequence_item "-" (_)) @sequence)))
@@ -407,6 +437,7 @@ Assumes that flow mappings have been previously reduced to one line."
 ;;     del-ovs))
 
 (defun yaml-pro-format-ts--reduce-spaces ()
+  "Remove multiple spaces when not affecting meaning."
   (let* ((del-ovs '()))
     (save-excursion
       (save-match-data
@@ -414,7 +445,7 @@ Assumes that flow mappings have been previously reduced to one line."
         (while (search-forward-regexp "[ \t][ \t]+" nil t)
           (when (not (looking-back "\n *" (- (point) 80)))
             (let* ((at-node-type (treesit-node-type (treesit-node-on (match-beginning 0) (match-end 0)))))
-              (when (not (member at-node-type '("string_scalar" "double_quote_scalar" "single_quote_scalar" "block_scalar" "block_sequence_item")))
+              (when (not (member at-node-type '("string_scalar" "double_quote_scalar" "single_quote_scalar" "block_scalar" "block_sequence_item" "comment")))
                 (let* ((ov (make-overlay (match-beginning 0) (match-end 0))))
 
                   (overlay-put ov 'yaml-pro-format-insert " ")
@@ -521,7 +552,7 @@ This is needed due to a mismatch of the TreeSitter grammer and the YAML spec."
    (t t)))
 
 (defun yaml-pro-format-ts--indent ()
-  ""
+  "Indent elements according to tree position."
   (let* ((del-ovs '()))
     (save-excursion
       (save-match-data
@@ -570,9 +601,20 @@ OV is deleted after this function finishes."
   (setq yaml-pro-format-ts-indent-groups nil)
   (let* ((capture (treesit-query-capture (treesit-buffer-root-node) '((block_sequence) @seq))))
     (pcase-dolist (`(_ . ,seq-node) capture)
-      (let* ((items (treesit-query-capture (treesit-buffer-root-node) '((block_sequence_item "-") @item))))
+      (let* ((items (treesit-query-capture seq-node '((block_sequence_item "-") @item))))
         (setq items (seq-filter (pcase-lambda (`(_ . ,item-node))
                                   (treesit-node-eq (treesit-node-parent item-node) seq-node))
+                                items))
+        (when (> (length items) 1)
+          (push (seq-map (pcase-lambda (`(_ . ,node))
+                           (make-overlay (treesit-node-start node) (treesit-node-end node) nil t))
+                         items)
+                yaml-pro-format-ts-indent-groups)))))
+  (let* ((capture (treesit-query-capture (treesit-buffer-root-node) '((block_mapping) @map))))
+    (pcase-dolist (`(_ . ,map-node) capture)
+      (let* ((items (treesit-query-capture map-node '((block_mapping_pair ":") @item))))
+        (setq items (seq-filter (pcase-lambda (`(_ . ,item-node))
+                                  (treesit-node-eq (treesit-node-parent item-node) map-node))
                                 items))
         (when (> (length items) 1)
           (push (seq-map (pcase-lambda (`(_ . ,node))
@@ -599,17 +641,17 @@ OV is deleted after this function finishes."
     ovs))
 
 (defun yaml-pro-format-ts ()
+  "Format the YAML buffer according to pre-defined rules."
   (interactive)
-  (save-excursion ;; TODO - dont depend on this
+  (save-excursion
     (goto-char (point-max))
     (insert "\n"))
   (yaml-pro-format-ts--create-indent-groups)
   (let* ((fmt-functions '(yaml-pro-format-ts--reduce-newlines
                           yaml-pro-format-ts--document-separator-own-line
                           yaml-pro-format-ts--oneline-flow
-                          ;; yaml-pro-format-ts--no-comments-after-tags
                           yaml-pro-format-ts--bm-single-space
-                          yaml-pro-format-ts--flow-groupings-nospace
+                          yaml-pro-format-ts--flow-seq-grouping-space
                           yaml-pro-format-ts--reduce-spaces
                           yaml-pro-format-ts--block-sequence
                           yaml-pro-format-ts--bm-fn-next-line
@@ -628,7 +670,8 @@ OV is deleted after this function finishes."
           (seq-map #'yaml-pro-format-ts--process-overlay ovs)))
       (let* ((ovs (yaml-pro-format-ts--ensure-indent-groups)))
         (save-excursion
-          (seq-map #'yaml-pro-format-ts--process-overlay ovs))))))
+          (seq-map #'yaml-pro-format-ts--process-overlay ovs))))
+    (delete-trailing-whitespace (point-min) (point-max))))
 
 (provide 'yaml-pro-format)
 
