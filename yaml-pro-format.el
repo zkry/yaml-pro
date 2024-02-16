@@ -695,6 +695,8 @@ OV is deleted after this function finishes."
 (defun yaml-pro-format-ts ()
   "Format the YAML buffer according to pre-defined rules."
   (interactive)
+  (when (treesit-query-capture (treesit-buffer-root-node) '((ERROR) @err))
+    (user-error "Error encountered when parsing buffer with treesitter.  Please ensure your syntax is correct and try again"))
   (save-excursion
     (goto-char (point-max))
     (insert "\n"))
