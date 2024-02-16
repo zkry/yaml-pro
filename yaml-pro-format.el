@@ -40,10 +40,36 @@
   :group 'yaml-pro
   :type 'integer)
 
-(defcustom yaml-pro-format-prose-wrap t
-  "Wrap block strings to one line if meaning stays the same."
+(defcustom yaml-pro-format-print-width 80
+  "Width until which to break flow sequences."
   :group 'yaml-pro
-  :type 'boolean)
+  :type 'integer)
+
+(defcustom yaml-pro-format-features '()
+  "Features to enable when formatting buffer."
+  :group 'yaml-pro
+  :type '(set (const :tag "Remove adjacent blank lines, leaving at most one"
+                     reduce-newlines)
+              (const :tag "Put document separators (---) are on a line of their own"
+                     document-separator-own-line)
+              (const :tag "Try to reduce flow (JSON-like) elements to one line"
+                     oneline-flow)
+              (const :tag "Format spacing around block elments' colon and dashes"
+                     block-formatting)
+              (const :tag "Reduce spacing down to one when appropriate"
+                     reduce-spaces)
+              (const :tag "Transform \"key: value\" to \"key:\\n  value\" if column passes `yaml-pro-format-print-width'"
+                     bm-fn-next-line)
+              (const :tag "Remove unnecessary document end indicator (...)"
+                     clean-doc-end)
+              (const :tag "Leave only one space before comments"
+                     remove-spaces-before-comments)
+              (const :tag "Flatten flow nodes if column passes `yaml-pro-format-print-width'"
+                     expand-long-flow)
+              (const :tag "Convert single-quoted strings to double-quoted strings"
+                     single-to-double)
+              (const :tag "Indent according to treesitter level information"
+                     indent)))
 
 (defun yaml-pro-format-ts--bm-single-space ()
   "Ensure proper spacing around the colon character in a block mapping."
@@ -321,7 +347,7 @@ Assumes that flow sequences have been previously reduced to one line."
     (pcase-dolist (`(_ . ,node) nodes)
       (when (save-excursion (goto-char (treesit-node-end node))
                             (and (looking-at-p ", *\n")
-                                 (> (current-column) 80)))
+                                 (> (current-column) yaml-pro-format-print-width)))
         (let* ((capture (treesit-query-capture
                          node
                          '((flow_sequence (flow_node) @child)))))
@@ -363,7 +389,7 @@ Assumes that flow mappings have been previously reduced to one line."
       (when (save-excursion
               (goto-char (treesit-node-end node))
               (and (looking-at-p ",? *\n")
-                   (or (> (current-column) 80)
+                   (or (> (current-column) yaml-pro-format-print-width)
                        ;; if the flow is already spanning multiple lines, expand
                        ;; it so it looks nice.
                        (not (= (line-number-at-pos (treesit-node-start node))
@@ -701,17 +727,17 @@ OV is deleted after this function finishes."
     (goto-char (point-max))
     (insert "\n"))
   (yaml-pro-format-ts--create-indent-groups)
-  (let* ((fmt-functions '(yaml-pro-format-ts--reduce-newlines
-                          yaml-pro-format-ts--document-separator-own-line
-                          yaml-pro-format-ts--oneline-flow
-                          yaml-pro-format-ts--bm-single-space
-                          yaml-pro-format-ts--flow-seq-grouping-space
-                          yaml-pro-format-ts--reduce-spaces
-                          yaml-pro-format-ts--block-sequence
-                          yaml-pro-format-ts--bm-fn-next-line
-                          yaml-pro-format-ts--clean-doc-end
-                          yaml-pro-format-ts--remove-spaces-before-comments
-                          (lambda ()
+  (let* ((fmt-functions '(yaml-pro-format-ts--reduce-newlines  ; reduce-newlines
+                          yaml-pro-format-ts--document-separator-own-line ; document-separator-own-line
+                          yaml-pro-format-ts--oneline-flow  ; oneline-flow
+                          yaml-pro-format-ts--bm-single-space ; block-formatting
+                          yaml-pro-format-ts--flow-seq-grouping-space ; oneline-flow || expand-flow
+                          yaml-pro-format-ts--reduce-spaces ; reduce-spaces
+                          yaml-pro-format-ts--block-sequence ; block-formatting
+                          yaml-pro-format-ts--bm-fn-next-line ; bm-fn-next-line
+                          yaml-pro-format-ts--clean-doc-end ; clean-doc-end
+                          yaml-pro-format-ts--remove-spaces-before-comments ; remove-spaces-before-comments
+                          (lambda () ; expand-long-flow
                             (yaml-pro-format-ts--run-while-changing
                              '(yaml-pro-format-ts--expand-long-flow-sequence
                                yaml-pro-format-ts--expand-long-flow-mapping)))
