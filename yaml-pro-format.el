@@ -24,11 +24,14 @@
 
 ;;; Commentary:
 
-;; yaml-pro-format is a command which will format the current buffer
-;; to make have uniform styling.
+;; yaml-pro-format-ts is a command which will format the current
+;; buffer to make have uniform styling.  The rules the formatter
+;; applies are defined in the `yaml-pro-format-features' variable.  By
+;; changing its value you can enable and disable formatting rules.
 ;;
-;; TODO - write up styling changes
-;;
+;; The pretty formatter was inspired by the prettier.js YAML formatter
+;; but does have a number of differences, some limited by the
+;; capabilities of Tree Sitter.
 
 ;;; Code:
 

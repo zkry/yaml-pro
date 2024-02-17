@@ -40,6 +40,7 @@
 
 (require 'yaml)
 (require 'yaml-pro-edit)
+(require 'yaml-pro-format)
 (require 'treesit nil t)
 (require 'consult nil t)
 
