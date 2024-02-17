@@ -381,14 +381,15 @@ If REMOVE is non-nil, pop item off `kill-ring'."
            (seq (string-trim seq))
            (seq-lines (split-string seq "\n"))
            (indent-lengths (save-match-data
-                             (seq-map
-                              (lambda (line)
-                                (string-match "^\\( *\\)" line)
-                                (length (match-string 1 line)))
-                              (seq-filter
-                               (lambda (line)
-                                 (string-match-p "^ *-" line))
-                               (cdr seq-lines)))))
+                             (or (seq-map
+                                  (lambda (line)
+                                    (string-match "^\\( *\\)" line)
+                                    (length (match-string 1 line)))
+                                  (seq-filter
+                                   (lambda (line)
+                                     (string-match-p "^ *-" line))
+                                   (cdr seq-lines)))
+                                 (list (* yaml-pro-indent 2)))))
            (smallest-indent (apply #'min indent-lengths))
            (smallest-indent-string (make-string smallest-indent ?\s))
            (seq-rest-lines-at-indent (string-join
