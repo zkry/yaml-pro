@@ -105,6 +105,22 @@
     (when parent-tree-top
       (goto-char (treesit-node-start parent-tree-top)))))
 
+(defun yaml-pro-ts-down-level ()
+  (interactive)
+  (let* ((at-node (treesit-node-at (point)))
+         (tree-top (yaml-pro-ts--until-mapping-or-list at-node))
+         (nodes (seq-map #'cdr
+                           (treesit-query-capture tree-top '((block_sequence_item) @match
+                                                             (block_mapping_pair) @match))))
+         (children (seq-sort-by
+                    #'treesit-node-start
+                    #'<
+                    (seq-filter
+                     (lambda (node)
+                       (treesit-node-eq tree-top (yaml-pro-ts--until-mapping-or-list node)))
+                     nodes))))
+    (goto-char (treesit-node-start (car children)))))
+
 
 (defun yaml-pro-ts-prev-mapping-node (tree-top type)
   "Return nearest previous sibling node of TREE-TOP of type TYPE."
@@ -469,6 +485,7 @@ inserted to make the tree retain its original structure."
     (prog1 map
       (define-key map (kbd "C-c C-x C-w") #'yaml-pro-ts-kill-subtree)
       (define-key map (kbd "C-c C-u") #'yaml-pro-ts-up-level)
+      (define-key map (kbd "C-c C-d") #'yaml-pro-ts-down-level)
 
       (define-key map (kbd "C-c C-p") #'yaml-pro-ts-prev-subtree)
       (define-key map (kbd "C-c C-n") #'yaml-pro-ts-next-subtree)
