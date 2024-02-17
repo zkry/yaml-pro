@@ -38,10 +38,8 @@
 (require 'treesit)
 (require 'cl-lib)
 
-(defcustom yaml-pro-format-indent 2
-  "Amount of spaces to indent YAML."
-  :group 'yaml-pro
-  :type 'integer)
+;; Use `yaml-pro-indent' as the formatting indentation amount.
+(defvar yaml-pro-indent 2)
 
 (defcustom yaml-pro-format-print-width 80
   "Width until which to break flow sequences."
@@ -242,12 +240,12 @@
                                          (treesit-node-start .close))))
               (overlay-put ov-beg 'yaml-pro-format-insert
                            (concat "\n" (make-string
-                                         (* after-open-indent yaml-pro-format-indent)
+                                         (* after-open-indent yaml-pro-indent)
                                          ?\s)))
               (overlay-put ov-end 'yaml-pro-format-insert
                            (concat ",\n" (make-string
                                           (* (- after-open-indent 1)
-                                             yaml-pro-format-indent)
+                                             yaml-pro-indent)
                                           ?\s)))
               (push ov-beg del-ovs)
               (unless (equal (treesit-node-type .before-close-node) "comment")
@@ -275,7 +273,7 @@
                                    (treesit-node-start .child))))
             (overlay-put
              ov 'yaml-pro-format-insert
-             (concat "\n" (make-string (* indent yaml-pro-format-indent) ?\s)))
+             (concat "\n" (make-string (* indent yaml-pro-indent) ?\s)))
             (push ov del-ovs)))))
     del-ovs))
 
@@ -352,7 +350,7 @@ Assumes that flow sequences have been previously reduced to one line."
                           (treesit-node-start child) (treesit-node-start child))))
                 (overlay-put
                  ov 'yaml-pro-format-insert
-                 (concat "\n" (make-string (* indent yaml-pro-format-indent) ?\s)))
+                 (concat "\n" (make-string (* indent yaml-pro-indent) ?\s)))
                 (push ov ovs)))))
         (pcase-dolist (`(_ . ,close) (treesit-query-capture
                                       node
@@ -367,7 +365,7 @@ Assumes that flow sequences have been previously reduced to one line."
                 (setq end-str ",\n"))
               (overlay-put ov 'yaml-pro-format-insert
                            (concat end-str
-                                   (make-string (* indent yaml-pro-format-indent)
+                                   (make-string (* indent yaml-pro-indent)
                                                 ?\s)))
               (push ov ovs))))))
     ovs))
@@ -400,7 +398,7 @@ Assumes that flow mappings have been previously reduced to one line."
                      (ov (make-overlay (treesit-node-start child)
                                        (treesit-node-start child))))
                 (overlay-put ov 'yaml-pro-format-insert
-                             (concat "\n" (make-string (* indent yaml-pro-format-indent)
+                             (concat "\n" (make-string (* indent yaml-pro-indent)
                                                        ?\s)))
                 (push ov ovs)))))
         (let* ((capture (treesit-query-capture
@@ -424,7 +422,7 @@ Assumes that flow mappings have been previously reduced to one line."
 
                   (overlay-put
                    ov 'yaml-pro-format-insert
-                   (concat end-str (make-string (* indent yaml-pro-format-indent) ?\s)))
+                   (concat end-str (make-string (* indent yaml-pro-indent) ?\s)))
                   (push ov ovs))))))))
     ovs))
 
@@ -634,7 +632,7 @@ a blank line above it."
                   (yaml-pro-format-ts--lowest-block-scalar-indent root-node)))
       (cl-incf ct (/ (- (current-column)
                         (yaml-pro-format-ts--lowest-block-scalar-indent root-node))
-                     yaml-pro-format-indent)))
+                     yaml-pro-indent)))
     ct))
 
 (defun yaml-pro-format-ts--should-indent-p (node)
@@ -660,7 +658,7 @@ a blank line above it."
                                 at-node))
               (let* ((indent (yaml-pro-format-ts--node-indent at-node))
                      (indent-str
-                      (make-string (* indent yaml-pro-format-indent) ?\s))
+                      (make-string (* indent yaml-pro-indent) ?\s))
                      (ov (make-overlay (1+ (match-beginning 0)) (point))))
                 (overlay-put ov 'yaml-pro-format-insert indent-str)
                 (push ov del-ovs)))))))
@@ -743,11 +741,10 @@ OV is deleted after this function finishes."
              ((< 0 indent-diff)
               (let* ((ov (make-overlay (overlay-start node)
                                        (overlay-start node))))
-                (overlay-put ov 'yaml-pro-format-indent
+                (overlay-put ov 'yaml-pro-format-insert
                              (make-string indent-diff ?\s))
                 (push ov ovs))))))))
     ovs))
-
 
 (defconst yaml-pro-format-ts-functions
   '((reduce-newlines . yaml-pro-format-ts--reduce-newlines)

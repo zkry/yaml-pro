@@ -40,7 +40,7 @@ PRETTIER/TESTS/FORMAT/YAML-DIRECTORY is the file path to where the tests are loc
 
 (defun yaml-pro-format-ts-tests--run-test (test-case &optional display-diff)
   (pcase-let* ((`(,options ,in ,out) test-case))
-    (let* ((yaml-pro-format-indent (or (alist-get 'tabWidth options) 2))
+    (let* ((yaml-pro-indent (or (alist-get 'tabWidth options) 2))
            (got (with-temp-buffer
                   (insert in)
                   (yaml-ts-mode)
