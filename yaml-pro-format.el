@@ -79,27 +79,16 @@
   (let* ((nodes (treesit-query-capture
                  (treesit-buffer-root-node)
                  '((block_mapping_pair
-                    key: (flow_node)
-                    value: [(flow_node) (block_node)])
-                   @bm)))
-         (del-ovs '()))
-    (save-excursion
-      (pcase-dolist (`(_ . ,node) nodes)
-        (let* ((child-nodes
-                (treesit-query-capture
-                 node
-                 '((block_mapping_pair
                     key: (flow_node) @key
                     ":" @colon
                     value: [(flow_node) (block_node)] @val))))
-               (child-nodes (seq-filter
-                             (pcase-lambda (`(_ . ,n))
-                               (treesit-node-eq (treesit-node-parent n)
-                                                node))
-                             child-nodes))
-               (colon-node (alist-get 'colon child-nodes))
-               (key-node (alist-get 'key child-nodes))
-               (val-node (alist-get 'val child-nodes)))
+         (del-ovs '()))
+    (while nodes
+      (save-excursion
+        (let* ((colon-node (alist-get 'colon nodes))
+               (key-node (alist-get 'key nodes))
+               (val-node (alist-get 'val nodes)))
+          (setq nodes (cdddr nodes))
           (when (and (not (= (treesit-node-start colon-node)
                              (treesit-node-end key-node)))
                      ;; we should only be overwriting blank here
@@ -266,14 +255,13 @@
   "If a flow node passes the 80th column, put it on the next line."
   (let* ((nodes (treesit-query-capture
                  (treesit-buffer-root-node)
-                 '((block_mapping_pair ":" :anchor value: (flow_node)) @node)))
-         (del-ovs '()))
-    (pcase-dolist (`(_ . ,node) nodes)
-      (let-alist (treesit-query-capture
-                  node
-                  '((block_mapping_pair
+                 '((block_mapping_pair
                      ":" @colon :anchor value: (flow_node) @child)
-                    @parent))
+                    @parent)))
+         (del-ovs '()))
+    (while nodes
+      (let-alist (seq-take nodes 3)
+        (setq nodes (cdddr nodes))
         (when (and (= (line-number-at-pos (treesit-node-start .parent))
                       (line-number-at-pos (treesit-node-start .child)))
                    (> (save-excursion (goto-char (treesit-node-end .child))
@@ -441,23 +429,21 @@ Assumes that flow mappings have been previously reduced to one line."
   "Ensure proper spacing around sequences' - character."
   (let* ((nodes (treesit-query-capture
                  (treesit-buffer-root-node)
-                 '((block_sequence_item "-" (_)) @sequence)))
+                 `((block_sequence_item "-" @dash (_) @elt))))
+         (groups (seq-group-by
+                  (lambda (capture)
+                    (treesit-node-parent (cdr capture)))
+                  nodes))
          (del-ovs '()))
-    (save-excursion
-      (pcase-dolist (`(_ . ,node) nodes)
-        (let* ((child-nodes (treesit-query-capture
-                             node `((block_sequence_item "-" @dash (_) @elt))))
-               (child-nodes (seq-filter
-                             (pcase-lambda (`(_ . ,n))
-                               (treesit-node-eq (treesit-node-parent n)
-                                                node))
-                             child-nodes))
-               (dash-node (alist-get 'dash child-nodes))
-               (elt-node (alist-get 'elt child-nodes)))
+    (while groups
+      (save-excursion
+        (let* ((dash-node (alist-get 'dash (cdar groups)))
+               (elt-node (alist-get 'elt (cdar groups))))
           (let ((ov (make-overlay (treesit-node-end dash-node)
                                   (treesit-node-start elt-node))))
             (overlay-put ov 'yaml-pro-format-insert " ")
-            (push ov del-ovs)))))
+            (push ov del-ovs)))
+        (setq groups (cdr groups))))
     del-ovs))
 
 (defun yaml-pro-format-ts--single-to-double ()
@@ -709,36 +695,32 @@ OV is deleted after this function finishes."
   "Populate `yaml-pro-format-ts-indent-groups' based on initial tree."
   (setq yaml-pro-format-ts-indent-groups nil)
   (let* ((capture (treesit-query-capture
-                   (treesit-buffer-root-node) '((block_sequence) @seq))))
-    (pcase-dolist (`(_ . ,seq-node) capture)
-      (let* ((items (treesit-query-capture
-                     seq-node '((block_sequence_item "-") @item))))
-        (setq items (seq-filter
-                     (pcase-lambda (`(_ . ,item-node))
-                       (treesit-node-eq (treesit-node-parent item-node) seq-node))
-                     items))
-        (when (> (length items) 1)
-          (push (seq-map
-                 (pcase-lambda (`(_ . ,node))
-                   (make-overlay (treesit-node-start node)
-                                 (treesit-node-end node) nil t))
-                 items)
-                yaml-pro-format-ts-indent-groups)))))
+                   (treesit-buffer-root-node)
+                   '((block_sequence_item "-") @item)))
+         (groups (seq-group-by (pcase-lambda (node)
+                                 (treesit-node-parent node))
+                               (seq-map #'cdr capture))))
+    (pcase-dolist (`(_ . ,items) groups)
+      (when (> (length items) 1)
+        (push (seq-map
+               (pcase-lambda (node)
+                 (make-overlay (treesit-node-start node)
+                               (treesit-node-end node) nil t))
+               items)
+              yaml-pro-format-ts-indent-groups))))
   (let* ((capture (treesit-query-capture
-                   (treesit-buffer-root-node) '((block_mapping) @map))))
-    (pcase-dolist (`(_ . ,map-node) capture)
-      (let* ((items (treesit-query-capture
-                     map-node '((block_mapping_pair ":") @item))))
-        (setq items (seq-filter
-                     (pcase-lambda (`(_ . ,item-node))
-                       (treesit-node-eq (treesit-node-parent item-node) map-node))
-                     items))
-        (when (> (length items) 1)
-          (push (seq-map (pcase-lambda (`(_ . ,node))
-                           (make-overlay (treesit-node-start node)
-                                         (treesit-node-end node) nil t))
-                         items)
-                yaml-pro-format-ts-indent-groups))))))
+                   (treesit-buffer-root-node)
+                   '((block_mapping_pair ":") @item)))
+         (groups (seq-group-by (pcase-lambda (node)
+                                 (treesit-node-parent node))
+                               (seq-map #'cdr capture))))
+    (pcase-dolist (`(_ . ,items) groups)
+      (when (> (length items) 1)
+        (push (seq-map (pcase-lambda (node)
+                         (make-overlay (treesit-node-start node)
+                                       (treesit-node-end node) nil t))
+                       items)
+              yaml-pro-format-ts-indent-groups)))))
 
 (defun yaml-pro-format-ts--ensure-indent-groups ()
   "Ensure that indent groups are on same level of indentation."
