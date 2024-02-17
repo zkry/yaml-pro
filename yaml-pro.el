@@ -529,6 +529,21 @@ inserted to make the tree retain its original structure."
         (yaml-pro-ts-paste-subtree))
        (t (call-interactively #'yank))))))
 
+(defun yaml-pro-ts-newline (&optional arg interactive)
+  (interactive "*P\np")
+  (barf-if-buffer-read-only)
+  (cond
+   ((or (looking-at-p " *[^ \n]")
+        (equal (treesit-node-type (treesit-node-at (point))) ":")
+        (equal (treesit-node-type (treesit-node-parent (treesit-node-at (point))))
+               "block_scalar"))
+    (let* ((indent (yaml-pro-format-ts--node-indent (treesit-node-at (point))))
+           (indent-column (* indent yaml-pro-indent)))
+      (call-interactively #'newline)
+      (when (< (current-column) indent-column)
+        (insert (make-string (- indent-column (current-column)) ?\s)))))
+   (t (call-interactively #'newline))))
+
 (defun yaml-pro-ts--imenu-node-label (node)
   "Return an imenu label for NODE."
   (let ((top node)
@@ -636,6 +651,7 @@ KEYS are added as increasingly nested levels."
       (define-key map (kbd "C-c >") #'yaml-pro-ts-indent-subtree)
       (define-key map (kbd "C-c <") #'yaml-pro-ts-unindent-subtree)
 
+      (define-key map (kbd "<return>") #'yaml-pro-ts-newline)
       (define-key map (kbd "M-<return>") #'yaml-pro-ts-meta-return)
       (define-key map (kbd "M-?") #'yaml-pro-convolute-tree)
       (define-key map (kbd "C-c @") #'yaml-pro-ts-mark-subtree)
