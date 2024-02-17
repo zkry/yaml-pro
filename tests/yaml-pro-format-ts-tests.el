@@ -58,6 +58,8 @@ PRETTIER/TESTS/FORMAT/YAML-DIRECTORY is the file path to where the tests are loc
 
 (defvar yaml-pro-format-fail-cases nil)
 
+
+;; (yaml-pro-format-ts-tests--run)
 (defun yaml-pro-format-ts-tests--run ()
   "Run test suite, writing failed tests to file."
   (setq yaml-pro-format-fail-cases nil)
@@ -66,9 +68,10 @@ PRETTIER/TESTS/FORMAT/YAML-DIRECTORY is the file path to where the tests are loc
          (i 0))
     (dolist (test-case yaml-pro-format-ts-tests-cases)
       (message "TEST: %d" i)
-      (if (yaml-pro-format-ts-tests--run-test test-case)
-          (cl-incf ct)
-        (push test-case yaml-pro-format-fail-cases))
+      (ignore-errors
+        (if (yaml-pro-format-ts-tests--run-test test-case)
+            (cl-incf ct)
+          (push test-case yaml-pro-format-fail-cases)))
       (cl-incf i))
     (message "Ran all tests! Results: %d/%d" ct total)
     (sit-for 2))

@@ -575,6 +575,44 @@ This is needed due to a mismatch of the TreeSitter grammer and the YAML spec."
                              (length (match-string 0 line))))
                          (string-lines (treesit-node-text node) t))))))
 
+(defun yaml-pro-format-ts--commenting-next-node (node)
+  "If NODE is a comment, return the node next in the tree if commenting it.
+Often times a comment block will be commenting on something below
+it.  We infer this if a comment is part of a block where there is
+a blank line above it."
+  (when (equal (treesit-node-type node) "comment")
+    (let* ((comment-block-start node)
+           (comment-block-end node))
+      (catch 'out
+       (while t
+         (let* ((next-sib (treesit-node-next-sibling comment-block-end)))
+           (if (and (equal (treesit-node-type next-sib) "comment")
+                    (= (line-number-at-pos (treesit-node-start next-sib))
+                       (1+ (line-number-at-pos (treesit-node-start comment-block-end)))))
+               (setq comment-block-end next-sib)
+             (throw 'out nil)))))
+      (catch 'out
+       (while t
+         (let* ((prev-sib (treesit-node-prev-sibling comment-block-start)))
+           (if (and (equal (treesit-node-type prev-sib) "comment")
+                    (= (line-number-at-pos (treesit-node-start prev-sib))
+                       (1- (line-number-at-pos (treesit-node-start comment-block-start)))))
+               (setq comment-block-start prev-sib)
+             (throw 'out nil)))))
+      (when (save-excursion
+              (goto-char (treesit-node-start comment-block-start))
+              (forward-line -1)
+              (looking-at-p " *\n"))
+        (let* ((next-block-node
+                (save-excursion
+                  (goto-char (treesit-node-start comment-block-end))
+                  (forward-line 1)
+                  (back-to-indentation)
+                  (and (looking-at-p " *[^ \n\t]")
+                       (treesit-node-at (point))))))
+          (when (not (equal (treesit-node-type next-block-node) "comment"))
+            next-block-node))))))
+
 (defun yaml-pro-format-ts--node-indent (root-node)
   "Return the number of indent parents of ROOT-NODE."
   (let* ((ct 0)
@@ -627,6 +665,10 @@ This is needed due to a mismatch of the TreeSitter grammer and the YAML spec."
           (forward-char -1)
           (let* ((at-node (treesit-node-at (point))))
             (when (yaml-pro-format-ts--should-indent-p at-node)
+              ;; in certain cases, a comment should be indented by the node
+              ;; after it.
+              (setq at-node (or (yaml-pro-format-ts--commenting-next-node at-node)
+                                at-node))
               (let* ((indent (yaml-pro-format-ts--node-indent at-node))
                      (indent-str
                       (make-string (* indent yaml-pro-format-indent) ?\s))
@@ -726,11 +768,11 @@ OV is deleted after this function finishes."
   '((reduce-newlines . yaml-pro-format-ts--reduce-newlines)
     (document-separator-own-line . yaml-pro-format-ts--document-separator-own-line)
     (oneline-flow . yaml-pro-format-ts--oneline-flow)
-    (block-formatting . yaml-pro-format-ts--bm-single-space) ;
+    (block-formatting . yaml-pro-format-ts--bm-single-space)
     ((or oneline-flow expand-flow) . yaml-pro-format-ts--flow-seq-grouping-space)
     (reduce-spaces . yaml-pro-format-ts--reduce-spaces)
-    (block-formatting . yaml-pro-format-ts--block-sequence) ;
-    (bm-fn-next-line . yaml-pro-format-ts--bm-fn-next-line) ;
+    (block-formatting . yaml-pro-format-ts--block-sequence)
+    (bm-fn-next-line . yaml-pro-format-ts--bm-fn-next-line)
     (clean-doc-end . yaml-pro-format-ts--clean-doc-end)
     (remove-spaces-before-comments . yaml-pro-format-ts--remove-spaces-before-comments)
     (expand-long-flow .
