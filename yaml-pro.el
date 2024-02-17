@@ -464,6 +464,45 @@ inserted to make the tree retain its original structure."
     (when at-tree
       (yaml-pro-ts--imenu-node-label at-tree))))
 
+(defun yaml-pro-ts-jump-to-definition (&rest parts)
+  "Jump to a part of the YAML file based on PARTS.
+If element is a sting, use it as block mapping key.
+If element is a number, use it as a sequence index."
+  (let* ((key (string-join
+               (seq-map
+                (lambda (elt)
+                  (if (numberp elt)
+                      (format "[%d]" elt)
+                    elt))
+                parts)
+               ".")))
+    (imenu key)))
+
+(defun yaml-pro-ts-add-mapping (&rest keys)
+  "Add KEYS as levels beneath current node's block mapping.
+KEYS are added as increasingly nested levels."
+  (let* ((at-node (treesit-node-at (point)))
+         (parent (treesit-parent-until
+                  at-node
+                  (lambda (node)
+                    (equal (treesit-node-type node) "block_mapping_pair"))
+                  t))
+         (parent-indent (save-excursion
+                          (goto-char (treesit-node-start parent))
+                          (current-column))))
+    (if (equal (treesit-node-type (car (treesit-node-children (treesit-node-child-by-field-name parent "value"))))
+               "block_mapping")
+        (progn
+          (goto-char (treesit-node-end parent))
+          (while keys
+            (insert "\n")
+            (insert (make-string parent-indent ?\s))
+            (insert (make-string yaml-pro-indent ?\s))
+            (insert (car keys) ":")
+            (setq keys (cdr keys))
+            (cl-incf parent-indent yaml-pro-indent)))
+      (user-error "unable to to insert element at position"))))
+
 (defconst yaml-pro-ts-mode-map
   (let ((map (make-sparse-keymap)))
     (prog1 map
