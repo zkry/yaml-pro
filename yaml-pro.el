@@ -562,6 +562,63 @@ inserted to make the tree retain its original structure."
     (when at-tree
       (yaml-pro-ts--imenu-node-label at-tree))))
 
+(defun yaml-pro-ts--path-to-imenu-key (path)
+  "Stringify path to the same format that imenu uses.
+E.g. the path (\"one\" 0 \"two\") results in the key string \"one.[0].two\"."
+  (string-join
+   (seq-map
+    (lambda (elt) (if (numberp elt) (format "[%d]" elt) elt))
+    path)
+   "."))
+
+(defun yaml-pro-ts-jump-to-definition (&rest parts)
+  "Jump to a part of the YAML file based on PARTS.
+If element is a sting, use it as block mapping key.
+If element is a number, use it as a sequence index."
+  (imenu (yaml-pro-ts--path-to-imenu-key parts)))
+
+(defun yaml-pro-ts-add-mapping (&rest keys)
+  "Add KEYS as levels beneath current node's block mapping.
+KEYS are added as increasingly nested levels."
+  (let* ((paths (seq-map #'car (yaml-pro-ts-create-index)))
+         (to-go keys)
+         (to-add'()))
+    (while (and (not (member (yaml-pro-ts--path-to-imenu-key to-go) paths))
+                to-go)
+      (setq to-add (append (last to-go) to-add))
+      (setq to-go (butlast to-go)))
+    (when to-go
+      (apply #'yaml-pro-ts-jump-to-definition to-go))
+    (when to-add
+      (let* ((at-node (treesit-node-at (point)))
+             (parent (treesit-parent-until
+                      at-node
+                      (lambda (node)
+                        (equal (treesit-node-type node) "block_mapping_pair"))
+                      t))
+             (parent-indent (if to-go
+                                (save-excursion
+                                  (goto-char (treesit-node-start parent))
+                                  (current-column))
+                              (- yaml-pro-indent))))
+        (if (or (not to-go)
+                (or (not (treesit-node-child-by-field-name parent "value"))
+                    (equal (treesit-node-type (car (treesit-node-children (treesit-node-child-by-field-name parent "value"))))
+                           "block_mapping")))
+            (progn
+              (if to-go
+                  (goto-char (treesit-node-end parent))
+                (goto-char (point-max))
+                (unless (looking-back "\n" (- (point) 2))
+                  (insert "\n")))
+              (while to-add
+                (insert "\n")
+                (insert (make-string (+ yaml-pro-indent parent-indent) ?\s))
+                (insert (car to-add) ":")
+                (setq to-add (cdr to-add))
+                (cl-incf parent-indent yaml-pro-indent)))
+          (user-error "unable to to insert element at position"))))))
+
 (defconst yaml-pro-ts-mode-map
   (let ((map (make-sparse-keymap)))
     (prog1 map
