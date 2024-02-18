@@ -407,6 +407,52 @@ hierarchy of headlines by UP levels before marking the subtree."
       (let ((node (treesit-parse-string kill 'yaml)))
         (treesit-query-capture node '((block_mapping_pair) @key))))))
 
+(defun yaml-pro-ts--kill-is-sequence (&optional tree)
+  "Return non-nil if TREE (or current kill) is a valid sequence."
+  (unless tree
+    (setq tree (current-kill 0)))
+  (let* ((kill (and kill-ring (current-kill 0)))
+         (first-line (car (string-split (string-trim-left kill) "\n"))))
+    (when (and kill (> (length (string-split kill "\n")) 1))
+      (let ((node (treesit-parse-string first-line 'yaml)))
+        (treesit-query-capture node '((block_sequence) @key))))))
+
+(defun yaml-pro-ts-paste-sequence (&optional remove)
+  "Insert the current kill into the buffer, preserving sequence structure.
+If REMOVE is non-nil, pop item off `kill-ring'."
+  (interactive)
+  (let ((seq (current-kill 0)))
+    (unless (yaml-pro-ts--kill-is-sequence seq)
+      (user-error
+       (substitute-command-keys
+        "The kill is not a YAML-sequence. Use `\\[yank]' to yank anyways")))
+    (let* ((base-indent (current-column))
+           (seq (string-trim seq))
+           (seq-lines (split-string seq "\n"))
+           (indent-lengths (save-match-data
+                             (or (seq-map
+                                  (lambda (line)
+                                    (string-match "^\\( *\\)" line)
+                                    (length (match-string 1 line)))
+                                  (seq-filter
+                                   (lambda (line)
+                                     (string-match-p "^ *-" line))
+                                   (cdr seq-lines)))
+                                 (list (* yaml-pro-indent 2)))))
+           (smallest-indent (apply #'min indent-lengths))
+           (smallest-indent-string (make-string smallest-indent ?\s))
+           (seq-rest-lines-at-indent (string-join
+                                      (seq-map
+                                       (lambda (line)
+                                         (concat
+                                          (make-string base-indent ?\s)
+                                          (string-remove-prefix smallest-indent-string line)))
+                                       (cdr seq-lines))
+                                      "\n")))
+      (push-mark (point) 'nomsg)
+      (insert (car seq-lines) "\n")
+      (insert seq-rest-lines-at-indent))))
+
 (defun yaml-pro-ts-paste-subtree (&optional remove)
   "Insert the current kill into the buffer, preserving tree structure.
 If REMOVE is non-nil, pop item off `kill-ring'."
@@ -473,8 +519,11 @@ inserted to make the tree retain its original structure."
                     (and (looking-at "[ \t]*$")
                          (string-match
                           "\\` +\\'"
-                          (buffer-substring (point-at-bol) (point))))))))
+                          (buffer-substring (point-at-bol) (point)))))))
+          (seqp (yaml-pro-ts--kill-is-sequence)))
       (cond
+       ((and seqp yaml-pro-ts-yank-subtrees)
+        (yaml-pro-ts-paste-sequence))
        ((and subtreep yaml-pro-ts-yank-subtrees)
         (yaml-pro-ts-paste-subtree))
        (t (call-interactively #'yank))))))
