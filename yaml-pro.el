@@ -120,7 +120,9 @@
                      (lambda (node)
                        (treesit-node-eq tree-top (yaml-pro-ts--until-mapping-or-list node)))
                      nodes))))
-    (goto-char (treesit-node-start (car children)))))
+    (if (car children)
+        (goto-char (treesit-node-start (car children)))
+      (beep))))
 
 
 (defun yaml-pro-ts-prev-mapping-node (tree-top type)
