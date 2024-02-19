@@ -653,7 +653,6 @@ KEYS are added as increasingly nested levels."
       (define-key map (kbd "C-c >") #'yaml-pro-ts-indent-subtree)
       (define-key map (kbd "C-c <") #'yaml-pro-ts-unindent-subtree)
 
-      (define-key map (kbd "<return>") #'yaml-pro-ts-newline)
       (define-key map (kbd "M-<return>") #'yaml-pro-ts-meta-return)
       (define-key map (kbd "M-?") #'yaml-pro-convolute-tree)
       (define-key map (kbd "C-c @") #'yaml-pro-ts-mark-subtree)
