@@ -321,7 +321,7 @@ resulting in the function being ran upon subsequent edits."
 
 (defun yaml-pro-edit-ts-scalar-node-at (point)
   "Return the node at POINT corresponding with editable scalar."
-  (let* ((at-node (treesit-node-at point)))
+  (let* ((at-node (treesit-node-at point 'yaml)))
     (cond
      ((member (treesit-node-type at-node) '("block_scalar" "string_scalar"))
       at-node)
