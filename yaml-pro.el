@@ -576,7 +576,7 @@ inserted to make the tree retain its original structure."
 
 (defun yaml-pro-ts-eldoc (&rest _ignored)
   "Return eldoc message of current point."
-  (let* ((at-tree (yaml-pro-ts--until-mapping-or-list (treesit-node-at (point) 'ymal))))
+  (let* ((at-tree (yaml-pro-ts--until-mapping-or-list (treesit-node-at (point) 'yaml))))
     (when at-tree
       (yaml-pro-ts--imenu-node-label at-tree))))
 
