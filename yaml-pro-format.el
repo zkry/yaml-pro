@@ -769,7 +769,7 @@ OV is deleted after this function finishes."
   "Alist of feature symbol and formatting functions.")
 
 
-(defun yaml-pro-format-ts ()
+(defun yaml-pro-format ()
   "Format the YAML buffer according to pre-defined rules."
   (interactive)
   (when (treesit-query-capture (treesit-buffer-root-node) '((ERROR) @err))
@@ -797,6 +797,8 @@ OV is deleted after this function finishes."
         (save-excursion
           (seq-map #'yaml-pro-format-ts--process-overlay ovs))))
     (delete-trailing-whitespace (point-min) (point-max))))
+
+(defalias 'yaml-pro-format-ts #'yaml-pro-format)
 
 (provide 'yaml-pro-format)
 
