@@ -92,7 +92,7 @@
   "Kill the entire subtree located at the current-point."
   (interactive)
   (let* ((at-node (treesit-node-at (point) 'yaml))
-         (tree-top (yaml-pro-ts--until-mapping at-node)))
+         (tree-top (yaml-pro-ts--until-mapping-or-list at-node)))
     (when tree-top
       (kill-region (treesit-node-start tree-top)
                    (treesit-node-end tree-top)))))
