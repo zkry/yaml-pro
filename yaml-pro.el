@@ -107,6 +107,7 @@
       (goto-char (treesit-node-start parent-tree-top)))))
 
 (defun yaml-pro-ts-down-level ()
+  "Move the point down to first child of current item."
   (interactive)
   (let* ((at-node (treesit-node-at (point) 'yaml))
          (tree-top (yaml-pro-ts--until-mapping-or-list at-node))
@@ -124,6 +125,29 @@
         (goto-char (treesit-node-start (car children)))
       (beep))))
 
+(defun yaml-pro-ts-first-sibling ()
+  "Move the point to the first sibling."
+  (interactive)
+  (let* ((at-node (treesit-node-at (point) 'yaml))
+         (at-sibling (yaml-pro-ts--until-mapping-or-list at-node))
+         (parent (treesit-node-parent at-sibling))
+         (all-siblings (treesit-node-children parent))
+         (first-sibling (car all-siblings)))
+    (if first-sibling
+        (goto-char (treesit-node-start first-sibling))
+      (beep))))
+
+(defun yaml-pro-ts-last-sibling ()
+  "Move the point to the last sibling."
+  (interactive)
+  (let* ((at-node (treesit-node-at (point) 'yaml))
+         (at-sibling (yaml-pro-ts--until-mapping-or-list at-node))
+         (parent (treesit-node-parent at-sibling))
+         (all-siblings (treesit-node-children parent))
+         (last-sibling (car (last all-siblings))))
+    (if last-sibling
+        (goto-char (treesit-node-start last-sibling))
+      (beep))))
 
 (defun yaml-pro-ts-prev-mapping-node (tree-top type)
   "Return nearest previous sibling node of TREE-TOP of type TYPE."
