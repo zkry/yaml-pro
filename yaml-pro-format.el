@@ -38,8 +38,7 @@
 (require 'treesit)
 (require 'cl-lib)
 
-;; Use `yaml-pro-indent' as the formatting indentation amount.
-(defvar yaml-pro-indent 2)
+(defvar yaml-pro-indent)
 
 (defcustom yaml-pro-format-print-width 80
   "Width until which to break flow sequences."
@@ -50,7 +49,42 @@
   '(reduce-newlines document-separator-own-line oneline-flow block-formatting
                     reduce-spaces bm-fn-next-line clean-doc-end remove-spaces-before-comments
                     expand-long-flow single-to-double indent)
-  "Features to enable when formatting buffer."
+  "Features to enable when formatting buffer.
+
+This value should be a list containing any of the following symbols:
+
+- `indent' When present, indent each line by `yaml-pro-indent'.
+
+- `reduce-newlines' When present, remove adjacent newlines so at
+  most one one remains.  New lines in strings won't be removed.
+
+- `oneline-flow' When present, reduce flow mappings to one line.
+
+- `block-formatting' When present, format the spacing around
+  block components' colons and dashes.
+
+- `reduce-spaces' When present, attempt to reduce multiple
+  adjacent space characters down to one.
+
+- `bm-fn-next-line' When present, move the value of a key-value pair to the
+  next line, indented, if it's width is longer than
+  `yaml-pro-format-print-width'.
+
+- `expand-log-flow' When present, flatten flow elements that pass
+  column `yaml-pro-format-print-width'.
+
+- `single-to-double' When present, convert single quoted strings
+  to double quoted, when it wouldn't change its meaning.
+
+- `remove-spaces-before-comments' When present, remove spaces
+  before a comment until it is one space after the preceeding
+  content (e.g. \"a: b   # space before here\").
+
+- `clean-doc-end' When present, remove unnecessary document-end
+  indicators (\"...\").
+
+- `document-separator-own-line' When present, makes sure the
+  document separator \"---\" isn't on a line with another element."
   :group 'yaml-pro
   :type '(set (const :tag "Remove adjacent blank lines, leaving at most one"
                      reduce-newlines)

@@ -43,6 +43,12 @@ tree-sitter and non-tree-sitter variants.
 
 # Demo
 
+### Formatter
+
+![formatter](./docs/formatter.gif)
+
+New in yaml-pro, a pretty formatter in Emacs Lisp powered by treesitter.
+
 ### Eldoc (tree-sitter)
 
 ![eldoc](./docs/eldoc.gif)
@@ -102,8 +108,10 @@ tree-sitter library installed
 
 ## Usage
 
+- **yaml-pro-format**
 - **yaml-pro-ts-kill-subtree** (<kbd>C-c</kbd> <kbd>C-x</kbd> <kbd>C-w</kbd>)
 - **yaml-pro-ts-up-level** (<kbd>C-c</kbd> <kbd>C-u</kbd>)
+- **yaml-pro-ts-down-level** (<kbd>C-c</kbd> <kbd>C-d</kbd>)
 - **yaml-pro-ts-next-subtree** (<kbd>C-c</kbd> <kbd>C-n</kbd>)
 - **yaml-pro-ts-prev-subtree** (<kbd>C-c</kbd> <kbd>C-p</kbd>)
 - **yaml-pro-ts-move-subtree-up** (<kbd>s-up</kbd>)
@@ -118,10 +126,98 @@ tree-sitter library installed
   - (use prefix argument <kbd>C-u</kbd> to supply an initialization
     command to set major mode)
 
+## Pretty formatter
+
+yaml-pro now comes with the addition of a new formatting command
+`yaml-pro-format`.  This requires tree-sitter to work.  There are
+different settings you can toggle on the formatter.  For ease of
+customization I recommend usind <kbd>M-x</kbd> <kbd>customize-variable</kbd>.
+The following is the customization options.
+
+- `indent` When present, indent each line by `yaml-pro-indent'.
+
+- `reduce-newlines` When present, remove adjacent newlines so at
+  most one one remains.  New lines in strings won't be removed.
+
+- `oneline-flow` When present, reduce flow mappings to one line.
+
+- `block-formatting` When present, format the spacing around
+  block components' colons and dashes.
+
+- `reduce-spaces` When present, attempt to reduce multiple
+  adjacent space characters down to one.
+
+- `bm-fn-next-line` When present, move the value of a key-value pair to the
+  next line, indented, if it's width is longer than
+  `yaml-pro-format-print-width`.
+
+- `expand-log-flow` When present, flatten flow elements that pass
+  column `yaml-pro-format-print-width`.
+
+- `single-to-double` When present, convert single quoted strings
+  to double quoted, when it wouldn't change its meaning.
+
+- `remove-spaces-before-comments` When present, remove spaces
+  before a comment until it is one space after the preceeding
+  content (e.g. "a: b   # space before here").
+
+- `clean-doc-end` When present, remove unnecessary document-end
+  indicators ("...").
+
+- `document-separator-own-line` When present, makes sure the
+  document separator "---" isn't on a line with another element.
+
+## Easy movement with repeat map
+
+With the following configuration and repeat-mode enabled, you can
+easily move around the YAML tree after executing one of the movement
+commands.
+
+```lisp
+;; the original bindings will work as well, these are shorter if you prefer them.
+(keymap-set yaml-pro-ts-mode-map "C-M-n" #'yaml-pro-ts-next-subtree)           ; was forward-list
+(keymap-set yaml-pro-ts-mode-map "C-M-p" #'yaml-pro-ts-prev-subtree)           ; was backward-list
+(keymap-set yaml-pro-ts-mode-map "C-M-u" #'yaml-pro-ts-up-level)               ; was backward-up-list
+(keymap-set yaml-pro-ts-mode-map "C-M-d" #'yaml-pro-ts-down-level)             ; was down-list
+(keymap-set yaml-pro-ts-mode-map "C-M-k" #'yaml-pro-ts-kill-subtree)           ; was kill-sexp
+(keymap-set yaml-pro-ts-mode-map "C-M-<backspace>" #'yaml-pro-ts-kill-subtree) ; was backward-kill-sexp
+(keymap-set yaml-pro-ts-mode-map "C-M-a" #'yaml-pro-ts-first-sibling)          ; was beginning-of-defun
+(keymap-set yaml-pro-ts-mode-map "C-M-e" #'yaml-pro-ts-last-sibling)           ; was end-of-defun
+
+(defvar-keymap my/yaml-pro/tree-repeat-map
+  :repeat t
+  "n" #'yaml-pro-ts-next-subtree
+  "p" #'yaml-pro-ts-prev-subtree
+  "u" #'yaml-pro-ts-up-level
+  "d" #'yaml-pro-ts-down-level
+  "m" #'yaml-pro-ts-mark-subtree
+  "k" #'yaml-pro-ts-kill-subtree
+  "a" #'yaml-pro-ts-first-sibling
+  "e" #'yaml-pro-ts-last-sibling
+  "SPC" #'my/yaml-pro/set-mark)
+
+(defun my/yaml-pro/set-mark ()
+  (interactive)
+  (my/region/set-mark 'my/yaml-pro/set-mark))
+
+(defun my/region/set-mark (command-name)
+  (if (eq last-command command-name)
+      (if (region-active-p)
+          (progn
+            (deactivate-mark)
+            (message "Mark deactivated"))
+        (activate-mark)
+        (message "Mark activated"))
+    (set-mark-command nil)))
+```
+
+Special thanks to @uqix for sharing this configuration.
+
 # Legacy Parser Version
 
 The following documentation is not applicable if you are using
-`yaml-pro-ts-mode` as your entry point.
+`yaml-pro-ts-mode` as your entry point.  It's not recommented however
+due to its slow parsing speed.
 
 ## Installation
 
