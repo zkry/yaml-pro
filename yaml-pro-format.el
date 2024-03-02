@@ -188,7 +188,7 @@ This value should be a list containing any of the following symbols:
       (pcase-dolist (`(_ . ,comma-node) nodes)
         (cond
          ((save-excursion (goto-char (treesit-node-end comma-node))
-                          (looking-at-p "}"))
+                          (looking-at-p " *\n? *}"))
           (let* ((ov (make-overlay (treesit-node-start comma-node)
                                    (treesit-node-end comma-node))))
             (overlay-put ov 'yaml-pro-format-insert " ")
