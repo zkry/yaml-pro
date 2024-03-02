@@ -175,14 +175,14 @@ commands.
 
 ```lisp
 ;; the original bindings will work as well, these are shorter if you prefer them.
-(keymap-set yaml-pro-ts-mode-map "C-M-n" #'yaml-pro-ts-next-subtree)           ; was forward-list
-(keymap-set yaml-pro-ts-mode-map "C-M-p" #'yaml-pro-ts-prev-subtree)           ; was backward-list
-(keymap-set yaml-pro-ts-mode-map "C-M-u" #'yaml-pro-ts-up-level)               ; was backward-up-list
-(keymap-set yaml-pro-ts-mode-map "C-M-d" #'yaml-pro-ts-down-level)             ; was down-list
-(keymap-set yaml-pro-ts-mode-map "C-M-k" #'yaml-pro-ts-kill-subtree)           ; was kill-sexp
-(keymap-set yaml-pro-ts-mode-map "C-M-<backspace>" #'yaml-pro-ts-kill-subtree) ; was backward-kill-sexp
-(keymap-set yaml-pro-ts-mode-map "C-M-a" #'yaml-pro-ts-first-sibling)          ; was beginning-of-defun
-(keymap-set yaml-pro-ts-mode-map "C-M-e" #'yaml-pro-ts-last-sibling)           ; was end-of-defun
+(keymap-set yaml-pro-ts-mode-map "C-M-n" #'yaml-pro-ts-next-subtree)
+(keymap-set yaml-pro-ts-mode-map "C-M-p" #'yaml-pro-ts-prev-subtree)
+(keymap-set yaml-pro-ts-mode-map "C-M-u" #'yaml-pro-ts-up-level)
+(keymap-set yaml-pro-ts-mode-map "C-M-d" #'yaml-pro-ts-down-level)
+(keymap-set yaml-pro-ts-mode-map "C-M-k" #'yaml-pro-ts-kill-subtree)
+(keymap-set yaml-pro-ts-mode-map "C-M-<backspace>" #'yaml-pro-ts-kill-subtree)
+(keymap-set yaml-pro-ts-mode-map "C-M-a" #'yaml-pro-ts-first-sibling)
+(keymap-set yaml-pro-ts-mode-map "C-M-e" #'yaml-pro-ts-last-sibling)
 
 (defvar-keymap my/yaml-pro/tree-repeat-map
   :repeat t
