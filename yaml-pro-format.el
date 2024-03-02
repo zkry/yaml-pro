@@ -206,7 +206,7 @@ This value should be a list containing any of the following symbols:
                    '((flow_mapping "}" @rbrace)))))
       (pcase-dolist (`(_ . ,rbrace-node) nodes)
         (when (save-excursion (goto-char (treesit-node-start rbrace-node))
-                              (not (looking-back "[ \n{]" (- (point) 3))))
+                              (not (looking-back "[ \n{] ?" (- (point) 4))))
           (let* ((ov (make-overlay (treesit-node-start rbrace-node)
                                    (treesit-node-start rbrace-node))))
             (overlay-put ov 'yaml-pro-format-insert " ")
@@ -321,7 +321,7 @@ This value should be a list containing any of the following symbols:
       (save-excursion
         (goto-char (treesit-node-end node))
         (skip-chars-forward "\n \t")
-        (let* ((next-node (treesit-node-at (point)) 'yaml))
+        (let* ((next-node (treesit-node-at (point) 'yaml)))
           (cond
            ((member (treesit-node-type next-node) '("comment" "directive_name"))
             ;; leave alone if next node is a comment
@@ -631,7 +631,7 @@ a blank line above it."
                   (goto-char (treesit-node-start comment-block-end))
                   (forward-line 1)
                   (back-to-indentation)
-                  (and (looking-at-p " *[^ \n\t]")
+                  (and (looking-at-p " *[^ \n\t-]")
                        (treesit-node-at (point) 'yaml)))))
           (when (not (equal (treesit-node-type next-block-node) "comment"))
             next-block-node))))))

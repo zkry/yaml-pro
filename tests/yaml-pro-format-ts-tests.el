@@ -68,8 +68,8 @@ PRETTIER/TESTS/FORMAT/YAML-DIRECTORY is the file path to where the tests are loc
          (i 0))
     (dolist (test-case yaml-pro-format-ts-tests-cases)
       (message "TEST: %d" i)
-      (ignore-errors
-        (if (yaml-pro-format-ts-tests--run-test test-case)
+      (let* ((result (ignore-errors (yaml-pro-format-ts-tests--run-test test-case))))
+        (if result
             (cl-incf ct)
           (push test-case yaml-pro-format-fail-cases)))
       (cl-incf i))
