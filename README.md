@@ -231,7 +231,7 @@ required version with the variable
 `yaml-pro-required-yaml-parser-version`.
 
 You can have yaml-pro-mode setup on yaml-mode loading with the
-configuration: `(add-hook 'yaml-mode-hook #'yaml-pro-mode)`
+configuration: `(add-hook 'yaml-mode-hook #'yaml-pro-mode 100)`
 
 ## Usage
 
