@@ -57,6 +57,11 @@
   :group 'yaml-pro
   :type 'boolean)
 
+(defcustom yaml-pro-ts-path-element-separator ?.
+  "Character separating path elements when generating node labels."
+  :group 'yaml-pro
+  :type 'character)
+
 (defun yaml-pro-ts--until-mapping (node)
   "Recursively look up from NODE returning first `block_mapping_pair'."
   (treesit-parent-until
@@ -581,10 +586,10 @@ inserted to make the tree retain its original structure."
         (let ((key-node (treesit-node-child-by-field-name node "key")))
           (when key-node
             (setq label (concat (treesit-node-text key-node)
-                                (if (equal label "") "" ".")
+                                (if (equal label "") "" (string yaml-pro-ts-path-element-separator))
                                 label)))))
        ((equal (treesit-node-type node) "block_sequence_item")
-        (setq label (format "[%d].%s" (treesit-node-index node) label))))
+        (setq label (format "[%d]%c%s" (treesit-node-index node) yaml-pro-ts-path-element-separator label))))
       (setq node (treesit-node-parent node)))
     label))
 
@@ -611,7 +616,7 @@ E.g. the path (\"one\" 0 \"two\") results in the key string \"one.[0].two\"."
    (seq-map
     (lambda (elt) (if (numberp elt) (format "[%d]" elt) elt))
     path)
-   "."))
+   (string yaml-pro-ts-path-element-separator)))
 
 (defun yaml-pro-ts-jump-to-definition (&rest parts)
   "Jump to a part of the YAML file based on PARTS.
