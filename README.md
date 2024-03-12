@@ -96,7 +96,9 @@ tree-sitter folding package will exist in the future.
 
 # Tree-sitter version
 
-To activate the mode, run `M-x yaml-pro-ts-mode`.
+To activate the mode, run `M-x yaml-pro-ts-mode`.  You can have this
+activated automatically by adding this to your configuration:
+`(add-hook 'yaml-mode-hook 'yaml-pro-ts-mode 100)` (or `'yaml-ts-mode-hook`).
 
 
 In order to run the tree-sitter version of this program, you should
