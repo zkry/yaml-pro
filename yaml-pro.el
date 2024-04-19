@@ -102,6 +102,14 @@
       (kill-region (treesit-node-start tree-top)
                    (treesit-node-end tree-top)))))
 
+(defun yaml-pro-copy-node-path-at-point ()
+  "Copy node path at point to clipboard."
+  (interactive)
+  (let* ((at-node (treesit-node-at (point) 'yaml))
+         (path (yaml-pro-ts--imenu-node-label at-node)))
+    (kill-new path)
+    (message "%s was copied to clipboard" (propertize path 'face '(bold default)))))
+
 (defun yaml-pro-ts-up-level ()
   "Move the point to the parent tree."
   (interactive)
