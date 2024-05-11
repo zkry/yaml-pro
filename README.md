@@ -31,6 +31,8 @@ re-implementation supports everything below, as well as the following:
   subtree, fixing indentation to be correct for different levels.
   When `yaml-pro-ts-yank-subtrees` is non-nil, yank will automatically
   call `yaml-pro-ts-paste-subtree` for subtrees.
+- **yaml-pro-copy-node-path-at-point**: Copy element path at point to
+  clipboard
 - **imenu**: an index of all keys and their path are build for imenu
 - **eldoc**: current path is shown as eldoc documentation. (enable
   with `eldoc-mode`)
