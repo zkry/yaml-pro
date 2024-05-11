@@ -17,7 +17,7 @@ The latest version of yaml-pro contains tree-sitter support (activated
 via `yaml-pro-ts-mode`).  In order to use this you will need to have a
 version of Emacs installed that supports tree-sitter, as well as the
 yaml tree-sitter parser from here:
-https://github.com/ikatyang/tree-sitter-yaml . The tree-sitter
+https://github.com/tree-sitter-grammars/tree-sitter-yaml . The tree-sitter
 re-implementation supports everything below, as well as the following:
 
 - **yaml-pro-ts-meta-return** (<kbd>M-return</kbd>): Add a new list
@@ -106,7 +106,7 @@ activated automatically by adding this to your configuration:
 In order to run the tree-sitter version of this program, you should
 have a version of Emacs that supports tree-sitter, as well as the yaml
 tree-sitter library installed
-(https://github.com/ikatyang/tree-sitter-yaml). Ex: having the file
+(https://github.com/tree-sitter-grammars/tree-sitter-yaml). Ex: having the file
 `libyaml.dylib` in `/usr/local/lib`.  With these in place,
 `(treesit-ready-p 'yaml)` should return `t`.
 
