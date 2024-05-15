@@ -387,11 +387,9 @@ initialization command."
                parent-buffer b (yaml-pro-edit--extract-scalar-text node-text yaml-indentation) type init-func nil)
             (yaml-pro-edit-initialize-buffer
              parent-buffer b (yaml-parse-string node-text) type init-func nil))
-          (switch-to-buffer-other-window b))))))
-
-(ignore-errors
-  (when (= a b)
-    (setq a (1+ a))))
+          (let ((window (display-buffer b)))
+            (when window
+              (select-window window))))))))
 
 ;;;###autoload
 (defun yaml-pro-edit-scalar (p)
