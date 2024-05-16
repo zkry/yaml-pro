@@ -36,8 +36,9 @@
       ;;(suppress-keymap map)
       (define-key map (kbd "C-c C-k") #'yaml-pro-edit-quit)
       (define-key map (kbd "C-c C-c") #'yaml-pro-edit-complete)
-      (define-key map (kbd "C-c C-s") #'yaml-pro-edit-change-output)))
-  "Eeymap of yaml-edit-mode.")
+      (define-key map (kbd "C-c C-s") #'yaml-pro-edit-change-output)
+      (define-key map (kbd "C-c C-m") #'yaml-pro-edit-change-major-mode)))
+  "Keymap of yaml-edit-mode.")
 
 (defconst yaml-pro-edit-buffer-name "*yaml-pro-edit*")
 (defvar-local yaml-pro-edit-ts-node-position nil)
@@ -141,7 +142,8 @@ Used to fetch location properties on completion.")
 (defun yaml-pro-edit--header-line ()
   "Return the string to display in the header line."
   (let* ((base-text (substitute-command-keys "Edit, then exit with \
-`\\[yaml-pro-edit-complete]' or abort with `\\[yaml-pro-edit-quit]'")))
+`\\[yaml-pro-edit-complete]' or abort with `\\[yaml-pro-edit-quit]'. \
+Change mode with `\\[yaml-pro-edit-change-major-mode]'. ")))
     (if yaml-pro-edit-output-type
         (let* ((type-str
                 (or (yaml-pro-edit--block-output yaml-pro-edit-output-type)
@@ -149,13 +151,13 @@ Used to fetch location properties on completion.")
                     (and (eql yaml-pro-edit-output-type 'single) "''")))
                (type-str-prp (propertize type-str 'face 'font-lock-string-face)))
           (concat base-text
-                  ". Outputting "
+                  "Outputting "
                   type-str-prp
                   (substitute-command-keys
-                   ", `\\[yaml-pro-edit-change-output]' to change")))
+                   ", `\\[yaml-pro-edit-change-output]' to change out type")))
       (concat base-text
               (substitute-command-keys
-               ". Change output with `\\[yaml-pro-edit-change-output]'")))))
+               "Change output with `\\[yaml-pro-edit-change-output]'")))))
 
 (defun yaml-pro-edit-initialize-buffer
     (parent-buffer buffer initial-text type initialize path)
@@ -220,6 +222,28 @@ resulting in the function being ran upon subsequent edits."
         (buffer-string)))))
 
 ;; Interactive Functions
+
+(defun yaml-pro-edit-change-major-mode ()
+  "Prompt the user to change major mode for edit buffer."
+  (interactive)
+  (unless yaml-pro-edit-mode
+    (user-error "not in yaml-pro edit buffer"))
+  (let* ((init-command (read-command "Major mode command: "))
+         (ts-node-position yaml-pro-edit-ts-node-position)
+         (scalar yaml-pro-edit-scalar)
+         (scalar-overlay yaml-pro-edit-scalar-overlay)
+         (parent-buffer yaml-pro-edit-parent-buffer)
+         (output-type yaml-pro-edit-output-type)
+         (initialization-cache yaml-pro-edit-initialization-cache))
+    (funcall init-command)
+    (yaml-pro-edit-mode)
+    (setq yaml-pro-edit-ts-node-position ts-node-position)
+    (setq yaml-pro-edit-scalar scalar)
+    (setq yaml-pro-edit-scalar-overlay scalar-overlay)
+    (setq yaml-pro-edit-parent-buffer parent-buffer)
+    (setq yaml-pro-edit-output-type output-type)
+    (setq yaml-pro-edit-initialization-cache initialization-cache)
+    (setq header-line-format (yaml-pro-edit--header-line))))
 
 (defun yaml-pro-edit-change-output ()
   "Change the selected output type after completing the YAML."
