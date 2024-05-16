@@ -35,7 +35,7 @@
 
 ;;; Code:
 
-(require 'treesit)
+(require 'treesit nil t)
 (require 'cl-lib)
 
 (defvar yaml-pro-indent)
