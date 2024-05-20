@@ -42,22 +42,44 @@
 
 (defconst yaml-pro-edit-buffer-name "*yaml-pro-edit*")
 (defvar-local yaml-pro-edit-ts-node-position nil)
+(put 'yaml-pro-edit-ts-node-position 'permanent-local t)
 (defvar-local yaml-pro-edit-scalar nil
   "The current scalar being edited on.
 Used to fetch location properties on completion.")
+(put 'yaml-pro-edit-scalar 'permanent-local t)
 (defvar-local yaml-pro-edit-scalar-overlay nil
   "Overlay to go on top of the text currently being edited.")
+(put 'yaml-pro-edit-scalar-overlay 'permanent-local t)
 (defvar-local yaml-pro-edit-parent-buffer nil
   "Reference to the buffer where the edited YAML originated.")
+(put 'yaml-pro-edit-parent-buffer 'permanent-local t)
 (defvar-local yaml-pro-edit-output-type nil
   "When completing an edit buffer, output scalar according to this.")
+(put 'yaml-pro-edit-output-type 'permanent-local t)
 (defvar-local yaml-pro-edit-initialization-cache nil
   "Hashmap of YAML path to initialization function.")
+(put 'yaml-pro-edit-initialization-cache 'permanent-local t)
+
 
 (define-minor-mode yaml-pro-edit-mode
   "Minor-mode for editing a YAML scalar in a separate buffer."
   :lighter " YAML-pro"
-  :keymap yaml-pro-edit-mode-map)
+  :keymap yaml-pro-edit-mode-map
+  (add-hook 'change-major-mode-hook
+            (lambda ()
+              (let ((buf (current-buffer)))
+                ;; Setting the header-line-format in the
+                ;; change-major-mode-hook doesn't work.  Probably some
+                ;; major mode thing is done after the hook call.  This
+                ;; timer hack makes sure the header-line-format is set
+                ;; properly.
+                (run-with-timer
+                 0.01 nil
+                 (lambda ()
+                   (with-current-buffer buf
+                     (setq header-line-format (yaml-pro-edit--header-line)))))))
+            nil t))
+(put 'yaml-pro-edit-mode 'permanent-local t)
 
 (defun yaml-pro-edit-cleanup-parent ()
   "Remove overlay and properties of edited text."
