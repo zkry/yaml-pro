@@ -36,28 +36,49 @@
       ;;(suppress-keymap map)
       (define-key map (kbd "C-c C-k") #'yaml-pro-edit-quit)
       (define-key map (kbd "C-c C-c") #'yaml-pro-edit-complete)
-      (define-key map (kbd "C-c C-s") #'yaml-pro-edit-change-output)
-      (define-key map (kbd "C-c C-m") #'yaml-pro-edit-change-major-mode)))
+      (define-key map (kbd "C-c C-s") #'yaml-pro-edit-change-output)))
   "Keymap of yaml-edit-mode.")
 
 (defconst yaml-pro-edit-buffer-name "*yaml-pro-edit*")
 (defvar-local yaml-pro-edit-ts-node-position nil)
+(put 'yaml-pro-edit-ts-node-position 'permanent-local t)
 (defvar-local yaml-pro-edit-scalar nil
   "The current scalar being edited on.
 Used to fetch location properties on completion.")
+(put 'yaml-pro-edit-scalar 'permanent-local t)
 (defvar-local yaml-pro-edit-scalar-overlay nil
   "Overlay to go on top of the text currently being edited.")
+(put 'yaml-pro-edit-scalar-overlay 'permanent-local t)
 (defvar-local yaml-pro-edit-parent-buffer nil
   "Reference to the buffer where the edited YAML originated.")
+(put 'yaml-pro-edit-parent-buffer 'permanent-local t)
 (defvar-local yaml-pro-edit-output-type nil
   "When completing an edit buffer, output scalar according to this.")
+(put 'yaml-pro-edit-output-type 'permanent-local t)
 (defvar-local yaml-pro-edit-initialization-cache nil
   "Hashmap of YAML path to initialization function.")
+(put 'yaml-pro-edit-initialization-cache 'permanent-local t)
+
 
 (define-minor-mode yaml-pro-edit-mode
   "Minor-mode for editing a YAML scalar in a separate buffer."
   :lighter " YAML-pro"
-  :keymap yaml-pro-edit-mode-map)
+  :keymap yaml-pro-edit-mode-map
+  (add-hook 'change-major-mode-hook
+            (lambda ()
+              (let ((buf (current-buffer)))
+                ;; Setting the header-line-format in the
+                ;; change-major-mode-hook doesn't work.  Probably some
+                ;; major mode thing is done after the hook call.  This
+                ;; timer hack makes sure the header-line-format is set
+                ;; properly.
+                (run-with-timer
+                 0.01 nil
+                 (lambda ()
+                   (with-current-buffer buf
+                     (setq header-line-format (yaml-pro-edit--header-line)))))))
+            nil t))
+(put 'yaml-pro-edit-mode 'permanent-local t)
 
 (defun yaml-pro-edit-cleanup-parent ()
   "Remove overlay and properties of edited text."
@@ -142,8 +163,7 @@ Used to fetch location properties on completion.")
 (defun yaml-pro-edit--header-line ()
   "Return the string to display in the header line."
   (let* ((base-text (substitute-command-keys "Edit, then exit with \
-`\\[yaml-pro-edit-complete]' or abort with `\\[yaml-pro-edit-quit]'. \
-Change mode with `\\[yaml-pro-edit-change-major-mode]'. ")))
+`\\[yaml-pro-edit-complete]' or abort with `\\[yaml-pro-edit-quit]'.")))
     (if yaml-pro-edit-output-type
         (let* ((type-str
                 (or (yaml-pro-edit--block-output yaml-pro-edit-output-type)
@@ -222,28 +242,6 @@ resulting in the function being ran upon subsequent edits."
         (buffer-string)))))
 
 ;; Interactive Functions
-
-(defun yaml-pro-edit-change-major-mode ()
-  "Prompt the user to change major mode for edit buffer."
-  (interactive)
-  (unless yaml-pro-edit-mode
-    (user-error "not in yaml-pro edit buffer"))
-  (let* ((init-command (read-command "Major mode command: "))
-         (ts-node-position yaml-pro-edit-ts-node-position)
-         (scalar yaml-pro-edit-scalar)
-         (scalar-overlay yaml-pro-edit-scalar-overlay)
-         (parent-buffer yaml-pro-edit-parent-buffer)
-         (output-type yaml-pro-edit-output-type)
-         (initialization-cache yaml-pro-edit-initialization-cache))
-    (funcall init-command)
-    (yaml-pro-edit-mode)
-    (setq yaml-pro-edit-ts-node-position ts-node-position)
-    (setq yaml-pro-edit-scalar scalar)
-    (setq yaml-pro-edit-scalar-overlay scalar-overlay)
-    (setq yaml-pro-edit-parent-buffer parent-buffer)
-    (setq yaml-pro-edit-output-type output-type)
-    (setq yaml-pro-edit-initialization-cache initialization-cache)
-    (setq header-line-format (yaml-pro-edit--header-line))))
 
 (defun yaml-pro-edit-change-output ()
   "Change the selected output type after completing the YAML."
