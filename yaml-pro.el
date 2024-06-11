@@ -700,6 +700,7 @@ KEYS are added as increasingly nested levels."
       (define-key map (kbd "C-c '") #'yaml-pro-edit-ts-scalar)))
   "Map for minor mode `yaml-pro-ts-mode'.")
 
+;;;###autoload
 (define-minor-mode yaml-pro-ts-mode
   "Minor mode to enable yaml-pro treesitter keymap.
 
