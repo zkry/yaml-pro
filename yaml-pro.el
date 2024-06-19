@@ -551,18 +551,29 @@ inserted to make the tree retain its original structure."
   (setq this-command 'yank)
   (if arg
       (call-interactively #'yank)
-    (let ((subtreep
-           (and (yaml-pro-ts--kill-is-subtree)
-                (or (bolp)
-                    (and (looking-at "[ \t]*$")
-                         (string-match
-                          "\\` +\\'"
-                          (buffer-substring (point-at-bol) (point)))))))
-          (seqp (yaml-pro-ts--kill-is-sequence)))
+    (let* ((subtreep (yaml-pro-ts--kill-is-subtree))
+           (seqp (yaml-pro-ts--kill-is-sequence))
+           (pos (point))
+           ;; Is point on a placeholder for a block node?
+           (block-allowed-p
+            (and
+             ;; The line must not have nothing but spaces after the point.
+             (looking-at "[ \t]*$")
+             (and (save-excursion
+                    (skip-chars-backward " \t")
+                    (or
+                     ;; The line is blank.
+                     (bolp)
+                     ;; The point is preceded by a block struct indicator.
+                     ;; Note that compact collections cannot be preceded by
+                     ;; anchors or tags.
+                     (and (memq (char-before) '(?- ?: ??))
+                          ;; Block struct indicators must be followed by spaces.
+                          (memq (char-before pos) '(?\s ?\t)))))))))
       (cond
-       ((and seqp yaml-pro-ts-yank-subtrees)
+       ((and seqp block-allowed-p yaml-pro-ts-yank-subtrees)
         (yaml-pro-ts-paste-sequence))
-       ((and subtreep yaml-pro-ts-yank-subtrees)
+       ((and subtreep block-allowed-p yaml-pro-ts-yank-subtrees)
         (yaml-pro-ts-paste-subtree))
        (t (call-interactively #'yank))))))
 
