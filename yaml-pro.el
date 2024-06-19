@@ -441,19 +441,17 @@ hierarchy of headlines by UP levels before marking the subtree."
 (defun yaml-pro-ts--kill-is-subtree (&optional tree)
   "Return non-nil if TREE (or current kill) is a valid tree."
   (unless tree
-    (setq tree (current-kill 0)))
-  (let* ((kill (and kill-ring (current-kill 0))))
-    (when (and kill (> (length (string-split kill "\n")) 1))
-      (let ((node (treesit-parse-string kill 'yaml)))
-        (treesit-query-capture node '((block_mapping_pair) @key))))))
+    (setq tree (and kill-ring (current-kill 0))))
+  (when (and tree (> (length (string-split tree "\n")) 1))
+    (let ((node (treesit-parse-string tree 'yaml)))
+      (treesit-query-capture node '((block_mapping_pair) @key)))))
 
 (defun yaml-pro-ts--kill-is-sequence (&optional tree)
   "Return non-nil if TREE (or current kill) is a valid sequence."
   (unless tree
-    (setq tree (current-kill 0)))
-  (let* ((kill (and kill-ring (current-kill 0)))
-         (first-line (car (string-split (string-trim-left kill) "\n"))))
-    (when (and kill (> (length (string-split kill "\n")) 1))
+    (setq tree (and kill-ring (current-kill 0))))
+  (let ((first-line (car (string-split (string-trim-left tree) "\n"))))
+    (when (and tree (> (length (string-split tree "\n")) 1))
       (let ((node (treesit-parse-string first-line 'yaml)))
         (treesit-query-capture node '((block_sequence) @key))))))
 
