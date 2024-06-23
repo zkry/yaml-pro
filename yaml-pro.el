@@ -441,19 +441,17 @@ hierarchy of headlines by UP levels before marking the subtree."
 (defun yaml-pro-ts--kill-is-subtree (&optional tree)
   "Return non-nil if TREE (or current kill) is a valid tree."
   (unless tree
-    (setq tree (current-kill 0)))
-  (let* ((kill (and kill-ring (current-kill 0))))
-    (when (and kill (> (length (string-split kill "\n")) 1))
-      (let ((node (treesit-parse-string kill 'yaml)))
-        (treesit-query-capture node '((block_mapping_pair) @key))))))
+    (setq tree (and kill-ring (current-kill 0))))
+  (when (and tree (> (length (string-split tree "\n")) 1))
+    (let ((node (treesit-parse-string tree 'yaml)))
+      (treesit-query-capture node '((block_mapping_pair) @key)))))
 
 (defun yaml-pro-ts--kill-is-sequence (&optional tree)
   "Return non-nil if TREE (or current kill) is a valid sequence."
   (unless tree
-    (setq tree (current-kill 0)))
-  (let* ((kill (and kill-ring (current-kill 0)))
-         (first-line (car (string-split (string-trim-left kill) "\n"))))
-    (when (and kill (> (length (string-split kill "\n")) 1))
+    (setq tree (and kill-ring (current-kill 0))))
+  (let ((first-line (car (string-split (string-trim-left tree) "\n"))))
+    (when (and tree (> (length (string-split tree "\n")) 1))
       (let ((node (treesit-parse-string first-line 'yaml)))
         (treesit-query-capture node '((block_sequence) @key))))))
 
@@ -553,18 +551,29 @@ inserted to make the tree retain its original structure."
   (setq this-command 'yank)
   (if arg
       (call-interactively #'yank)
-    (let ((subtreep
-           (and (yaml-pro-ts--kill-is-subtree)
-                (or (bolp)
-                    (and (looking-at "[ \t]*$")
-                         (string-match
-                          "\\` +\\'"
-                          (buffer-substring (point-at-bol) (point)))))))
-          (seqp (yaml-pro-ts--kill-is-sequence)))
+    (let* ((subtreep (yaml-pro-ts--kill-is-subtree))
+           (seqp (yaml-pro-ts--kill-is-sequence))
+           (pos (point))
+           ;; Is point on a placeholder for a block node?
+           (block-allowed-p
+            (and
+             ;; The line must not have nothing but spaces after the point.
+             (looking-at "[ \t]*$")
+             (and (save-excursion
+                    (skip-chars-backward " \t")
+                    (or
+                     ;; The line is blank.
+                     (bolp)
+                     ;; The point is preceded by a block struct indicator.
+                     ;; Note that compact collections cannot be preceded by
+                     ;; anchors or tags.
+                     (and (memq (char-before) '(?- ?: ??))
+                          ;; Block struct indicators must be followed by spaces.
+                          (memq (char-before pos) '(?\s ?\t)))))))))
       (cond
-       ((and seqp yaml-pro-ts-yank-subtrees)
+       ((and seqp block-allowed-p yaml-pro-ts-yank-subtrees)
         (yaml-pro-ts-paste-sequence))
-       ((and subtreep yaml-pro-ts-yank-subtrees)
+       ((and subtreep block-allowed-p yaml-pro-ts-yank-subtrees)
         (yaml-pro-ts-paste-subtree))
        (t (call-interactively #'yank))))))
 
