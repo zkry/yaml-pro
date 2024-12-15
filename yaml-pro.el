@@ -754,6 +754,13 @@ Note that this isn't fully compatable with every command."
 
 (defvar-local yaml-pro-buffer-tree nil)
 
+(defun yaml-pro--get-yaml-position (string)
+  "Return the property `yaml-position' of STRING.
+This function is needed as the parser may insert unpropertized
+spacing before the match."
+  (or (get-text-property 0 'yaml-position string)
+      (get-text-property 0 'yaml-position (string-trim-left string "[ \n]*"))))
+
 (defun yaml-pro--offset-parse-tree (tree offset)
   "Offset all TREE values of `yaml-position' property by OFFSET."
   (cond
@@ -763,7 +770,7 @@ Note that this isn't fully compatable with every command."
        (yaml-pro--offset-parse-tree elt offset))
      tree))
    ((stringp tree)
-    (let* ((yaml-position (get-text-property 0 'yaml-position tree)))
+    (let* ((yaml-position (yaml-pro--get-yaml-position tree)))
       (when yaml-position
         (let ((offset-position (cons (+ (car yaml-position) offset)
                                      (+ (cdr yaml-position) offset))))
@@ -845,8 +852,7 @@ Find subsection based off of POINT if provided."
          (when res
            (throw 'done res)))))
     ((stringp parse)
-     (let* ((bounds (or (get-text-property 0 'yaml-position parse)
-                        (get-text-property 1 'yaml-position (string-trim-left parse "[ \n]*"))))
+     (let* ((bounds (yaml-pro--get-yaml-position parse))
             (start (and bounds (car bounds)))
             (end (and bounds (cdr bounds))))
        (if (and start end (<= start point end))
@@ -864,7 +870,7 @@ that has to be done."
            (parse (yaml-parse-string-with-pos subsection-string))
            (val (yaml-pro--find-node parse (1+ (- (point) start-point)))))
       (when val
-        (let* ((yaml-position (get-text-property 0 'yaml-position val))
+        (let* ((yaml-position (yaml-pro--get-yaml-position val))
                (new-position (cons (1- (+ (car yaml-position) start-point))
                                    (1- (+ (cdr yaml-position) start-point)))))
           (set-text-properties 0 (length val) (list 'yaml-position new-position) val)
@@ -887,18 +893,18 @@ that has to be done."
       (cond
        ((and sub-blocks
              (stringp (car tree))
-             (let* ((bounds (get-text-property 0 'yaml-position (cadr tree)))
+             (let* ((bounds (yaml-pro--get-yaml-position (cadr tree)))
                     (start (car bounds))
                     (end (cdr bounds)))
                (and (numberp start) (<= start point end))))
-        (let* ((bounds (get-text-property 0 'yaml-position (cadr tree)))
+        (let* ((bounds (yaml-pro--get-yaml-position (cadr tree)))
                (start (car bounds))
                (end (cdr bounds)))
           (throw 'result (list start end))))
        (sub-blocks
         (car sub-blocks))
        ((stringp (car tree))
-        (let* ((bounds (get-text-property 0 'yaml-position (cadr tree)))
+        (let* ((bounds (yaml-pro--get-yaml-position (cadr tree)))
                (start (and bounds (car bounds)))
                (end (and bounds (cdr bounds))))
           (if (and (numberp start) (<= start point end))
@@ -924,7 +930,7 @@ that has to be done."
         ;; TODO should find best match instead of firt (?)
         (car sub-blocks))
        ((and (stringp (car tree)) (not (equal (car tree) "")))
-        (let* ((bounds (get-text-property 0 'yaml-position (cadr tree)))
+        (let* ((bounds (yaml-pro--get-yaml-position (cadr tree)))
                (start (and bounds (car bounds)))
                (end (and bounds (cdr bounds))))
           (if (and
@@ -951,7 +957,7 @@ that has to be done."
         ;; TODO should find best match instead of firt (?)
         (car sub-blocks))
        ((stringp (car tree))
-        (let* ((bounds (get-text-property 0 'yaml-position (cadr tree)))
+        (let* ((bounds (yaml-pro--get-yaml-position (cadr tree)))
                (start (and bounds (car bounds)))
                (end (and bounds (cdr bounds))))
           (if (and (numberp start)
@@ -991,7 +997,7 @@ that has to be done."
   "Return path up to POINT of TREE having visited at PATH."
   (cond
    ((stringp tree)
-    (let ((pos (get-text-property 0 'yaml-position tree)))
+    (let ((pos (yaml-pro--get-yaml-position tree)))
       (when (<= (car pos) point (cdr pos))
         path)))
    (t
@@ -1000,10 +1006,10 @@ that has to be done."
                (lambda (tuple)
                  (let* ((key (car tuple))
                         (key-pos (and (stringp key)
-                                      (get-text-property 0 'yaml-position key)))
+                                      (yaml-pro--get-yaml-position key)))
                         (val (cdr tuple))
                         (val-pos (and (stringp val)
-                                      (get-text-property 0 'yaml-position val))))
+                                      (yaml-pro--get-yaml-position val))))
                    (cond
                     ((and key-pos (<= (car key-pos) point (cdr key-pos)))
                      path)
