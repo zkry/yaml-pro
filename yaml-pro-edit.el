@@ -284,7 +284,7 @@ resulting in the function being ran upon subsequent edits."
           (setq edit-str (buffer-substring-no-properties (point-min) (point-max))))))
     (save-excursion
       (with-current-buffer yaml-pro-edit-parent-buffer
-        (let* ((pos (or yaml-pro-edit-ts-node-position
+        (let* ((pos (or (and yaml-pro-ts-mode yaml-pro-edit-ts-node-position)
                         (get-text-property 0 'yaml-position yaml-pro-edit-scalar)))
                (start (car pos))
                (end (cdr pos))
