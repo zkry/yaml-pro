@@ -845,7 +845,8 @@ Find subsection based off of POINT if provided."
          (when res
            (throw 'done res)))))
     ((stringp parse)
-     (let* ((bounds (get-text-property 0 'yaml-position parse))
+     (let* ((bounds (or (get-text-property 0 'yaml-position parse)
+                        (get-text-property 1 'yaml-position (string-trim-left parse "[ \n]*"))))
             (start (and bounds (car bounds)))
             (end (and bounds (cdr bounds))))
        (if (and start end (<= start point end))

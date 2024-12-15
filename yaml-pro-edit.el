@@ -23,7 +23,7 @@
 
 ;;; Commentary:
 
-;; M-x yaml-pro-edit-scalar
+;; M-x yaml-pro-edit-ts-scalar
 
 ;;; Code:
 
@@ -429,7 +429,8 @@ If prefix argument P is provided, prompt user for initialization command."
     (when (= 4 p)
       (setq init-func (read-command "Initialization command: ")))
     (setq yaml-pro-edit-scalar at-scalar)
-    (let* ((bounds (get-text-property 0 'yaml-position at-scalar))
+    (let* ((bounds (or (get-text-property 0 'yaml-position at-scalar)
+                       (get-text-property 0 'yaml-position (string-trim at-scalar "[ \n]*"))))
            (start (car bounds))
            (end (cdr bounds))
            (yaml-indentation (yaml-pro-edit--infer-indent start))
