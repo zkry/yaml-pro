@@ -245,17 +245,25 @@
           (equal (treesit-node-type at-node) "'")
           (equal (treesit-node-type at-node) "block_scalar"))
       (let ((sentence-end "\\. "))
-        (forward-sentence)))
+        (forward-sentence)
+        (when (not (equal
+                    (treesit-node-type at-node)
+                    (treesit-node-type (treesit-node-at (point) 'yaml))))
+          (goto-char (treesit-node-end at-node))
+          (forward-line 1)
+          (yaml-pro-ts-forward-sentence))))
      (t
       (let ((ring-bell-function #'ignore))
         (forward-line 1)
-        (while (looking-at "^ *\\(#.*\\)?$")
+        (while (and (looking-at "^ *\\(#.*\\)?$")
+                    (not (eobp)))
           (forward-line 1))
         (let ((start-point (point)))
           (catch 'done
            (while t
              (yaml-pro-ts-down-level)
-             (when (eql (point) start-point)
+             (when (or (eql (point) start-point)
+                       (eobp))
                (throw 'done t))
              (setq start-point (point))))
           (goto-char (pos-eol))))))))
