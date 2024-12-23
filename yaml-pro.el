@@ -195,6 +195,71 @@
         (goto-char (treesit-node-start prev-node))
       (ding))))
 
+(defun yaml-pro-ts-backward-sentence ()
+  (interactive)
+  (let* ((at-node (treesit-node-at (point) 'yaml))
+         (starting-point (point)))
+    (unless (bobp)
+      (cond
+       ((or (equal (treesit-node-type at-node) "\"")
+            (equal (treesit-node-type at-node) "'")
+            (equal (treesit-node-type at-node) "block_scalar"))
+        (let ((sentence-end "\\. "))
+          (backward-sentence)
+          (when (not (equal
+                      (treesit-node-type at-node)
+                      (treesit-node-type (treesit-node-at (point) 'yaml))))
+            (goto-char (treesit-node-start at-node))
+            (forward-line -1)
+            (yaml-pro-ts-backward-sentence))))
+       (t
+        (let ((ring-bell-function #'ignore))
+          (forward-line -1)
+          (while (looking-at "^ *\\(#.*\\)?$")
+            (forward-line -1))
+          (when (not (bobp))
+            (cl-flet ((move-to-leaf ()
+                        (let ((start-point (point)))
+                          (catch 'done
+                            (while t
+                              (yaml-pro-ts-down-level)
+                              (when (eql (point) start-point)
+                                (throw 'done t))
+                              (setq start-point (point))))
+                          (goto-char (pos-eol)))))
+              (let ((start (point)))
+                (while (progn (move-to-leaf)
+                              (>= (point) starting-point))
+                  (goto-char start)
+                  (forward-line -1)
+                  (while (and (looking-at "^ *\\(#.*\\)?$")
+                              (not (bobp)))
+                    (forward-line -1))
+                  (setq start (point))))))))))))
+
+(defun yaml-pro-ts-forward-sentence ()
+  (interactive)
+  (let* ((at-node (treesit-node-at (point) 'yaml)))
+    (cond
+     ((or (equal (treesit-node-type at-node) "\"")
+          (equal (treesit-node-type at-node) "'")
+          (equal (treesit-node-type at-node) "block_scalar"))
+      (let ((sentence-end "\\. "))
+        (forward-sentence)))
+     (t
+      (let ((ring-bell-function #'ignore))
+        (forward-line 1)
+        (while (looking-at "^ *\\(#.*\\)?$")
+          (forward-line 1))
+        (let ((start-point (point)))
+          (catch 'done
+           (while t
+             (yaml-pro-ts-down-level)
+             (when (eql (point) start-point)
+               (throw 'done t))
+             (setq start-point (point))))
+          (goto-char (pos-eol))))))))
+
 (defun yaml-pro-ts-next-subtree ()
   "Move the point to the next subtree or list."
   (interactive)
@@ -692,6 +757,9 @@ KEYS are added as increasingly nested levels."
 
       (define-key map (kbd "C-c C-p") #'yaml-pro-ts-prev-subtree)
       (define-key map (kbd "C-c C-n") #'yaml-pro-ts-next-subtree)
+
+      (define-key map (kbd "M-a") #'yaml-pro-ts-backward-sentence)
+      (define-key map (kbd "M-e") #'yaml-pro-ts-forward-sentence)
 
       (define-key map (kbd "s-<up>") #'yaml-pro-ts-move-subtree-up)
       (define-key map (kbd "s-<down>") #'yaml-pro-ts-move-subtree-down)
