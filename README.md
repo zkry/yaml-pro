@@ -118,6 +118,8 @@ tree-sitter library installed
 - **yaml-pro-ts-down-level** (<kbd>C-c</kbd> <kbd>C-d</kbd>)
 - **yaml-pro-ts-next-subtree** (<kbd>C-c</kbd> <kbd>C-n</kbd>)
 - **yaml-pro-ts-prev-subtree** (<kbd>C-c</kbd> <kbd>C-p</kbd>)
+- **yaml-pro-ts-forward-sentence** (<kbd>M-e</kbd>)
+- **yaml-pro-ts-backward-sentence** (<kbd>M-a</kbd>)
 - **yaml-pro-ts-move-subtree-up** (<kbd>s-up</kbd>)
 - **yaml-pro-ts-move-subtree-down** (<kbd>s-down</kbd>)
 - **yaml-pro-ts-meta-return** (<kbd>M-<return></kbd>)
