@@ -650,6 +650,8 @@ inserted to make the tree retain its original structure."
         (yaml-pro-ts-paste-subtree))
        (t (call-interactively #'yank))))))
 
+(put 'yaml-pro-ts-yank 'delete-selection t)
+
 (defun yaml-pro-ts-newline (&optional arg interactive)
   (interactive "*P\np")
   (barf-if-buffer-read-only)
