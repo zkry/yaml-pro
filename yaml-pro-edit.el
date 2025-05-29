@@ -358,6 +358,7 @@ resulting in the function being ran upon subsequent edits."
         (replace-regexp-in-string " *\n+ *" " " base-string)
       base-string)))
 
+;;;###autoload
 (defun yaml-pro-edit-ts-scalar (p)
   "Edit the scalar value at the point in a separate buffer.
 This command utilizes tree-sitter to detirmine syntax
