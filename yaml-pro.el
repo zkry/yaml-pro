@@ -823,9 +823,12 @@ Note that this isn't fully compatable with every command."
   '((t :inherit 'font-lock-comment-face))
   "Face for fold replacement text.")
 
-(defcustom yaml-pro-indent (if (boundp 'yaml-indent)
-                               yaml-indent
-                             2)
+(defcustom yaml-pro-indent
+  (cond ((boundp 'yaml-indent-offset)
+         yaml-indent-offset)
+        ((boundp 'yaml-indent)
+         yaml-indent)
+        (t 2))
   "Default indentation to use for yaml-pro."
   :group 'yaml-pro
   :type 'integer)
